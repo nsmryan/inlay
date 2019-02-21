@@ -8,9 +8,10 @@ extern crate loggerv;
 
 
 use std::io::{Read, Write};
+use std::io::BufReader;
 use std::fs::File;
 
-use byteorder::{LittleEndian, BigEndian, ByteOrder, WriteBytesExt};
+use byteorder::{LittleEndian, BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
 
 use structopt::StructOpt;
 
@@ -41,6 +42,9 @@ enum Opt {
 
         #[structopt(short="t", long="template")]
         template_file: String,
+
+        #[structopt(short="r", long="repeat", default_value="1")]
+        repetitions: usize,
      },
 }
 
@@ -49,7 +53,9 @@ fn to_field(typ: FieldType, value_str: String) -> Field {
     let value = to_value(typ, value_str);
     Field {
         value: value,
-        endianness: typ.endianness()
+        endianness: typ.endianness(),
+        typ: typ,
+        description: "".to_string(),
     }
 }
 
@@ -104,12 +110,157 @@ fn write_out<O: Write>(output: &mut O, field: Field) {
     }
 }
 
-fn read_field<R: Read>(reader: &mut R, template: &Template) -> Field {
-    unimplemented!()
+fn read_field<R: ReadBytesExt>(reader: &mut R, template: &Template) -> Field {
+    match template.typ {
+        FieldType::uint8_be => {
+            Field {
+                value: Value::Uint8(reader.read_u8().unwrap()),
+                endianness: Endianness::Big,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+
+        FieldType::int8_be => {
+            Field {
+                value: Value::Int8(reader.read_i8().unwrap()),
+                endianness: Endianness::Big,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+
+        FieldType::uint16_be => {
+            Field {
+                value: Value::Uint16(reader.read_u16::<BigEndian>().unwrap()),
+                endianness: Endianness::Big,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+
+        FieldType::int16_be => {
+            Field {
+                value: Value::Int16(reader.read_i16::<BigEndian>().unwrap()),
+                endianness: Endianness::Big,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+
+        FieldType::uint32_be => {
+            Field {
+                value: Value::Uint32(reader.read_u32::<BigEndian>().unwrap()),
+                endianness: Endianness::Big,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+
+        FieldType::int32_be => {
+            Field {
+                value: Value::Int32(reader.read_i32::<BigEndian>().unwrap()),
+                endianness: Endianness::Big,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+
+        FieldType::float_be => {
+            Field {
+                value: Value::Float(reader.read_f32::<BigEndian>().unwrap()),
+                endianness: Endianness::Big,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+
+        FieldType::double_be => {
+            Field {
+                value: Value::Double(reader.read_f64::<BigEndian>().unwrap()),
+                endianness: Endianness::Big,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+
+
+        FieldType::uint8_le => {
+            Field {
+                value: Value::Uint8(reader.read_u8().unwrap()),
+                endianness: Endianness::Little,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+
+        FieldType::int8_le => {
+            Field {
+                value: Value::Int8(reader.read_i8().unwrap()),
+                endianness: Endianness::Little,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+
+        FieldType::uint16_le => {
+            Field {
+                value: Value::Uint16(reader.read_u16::<LittleEndian>().unwrap()),
+                endianness: Endianness::Little,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+
+        FieldType::int16_le => {
+            Field {
+                value: Value::Int16(reader.read_i16::<LittleEndian>().unwrap()),
+                endianness: Endianness::Little,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+
+        FieldType::uint32_le => {
+            Field {
+                value: Value::Uint32(reader.read_u32::<LittleEndian>().unwrap()),
+                endianness: Endianness::Little,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+
+        FieldType::int32_le => {
+            Field {
+                value: Value::Int32(reader.read_i32::<LittleEndian>().unwrap()),
+                endianness: Endianness::Little,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+
+        FieldType::float_le => {
+            Field {
+                value: Value::Float(reader.read_f32::<LittleEndian>().unwrap()),
+                endianness: Endianness::Little,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+
+        FieldType::double_le => {
+            Field {
+                value: Value::Double(reader.read_f64::<LittleEndian>().unwrap()),
+                endianness: Endianness::Little,
+                typ: template.typ,
+                description: template.description.clone(),
+            }
+        },
+    }
 }
 
-fn write_field<W: Write>(writer: W, field: &Field, description: &String) {
-    unimplemented!()
+fn write_field<W: Write>(writer: &mut W, field: &Field, description: &String) {
+    writer.write_all(&field.to_record().as_bytes());
 }
 
 fn encode(in_file: &String, out_file: &String) {
@@ -136,7 +287,7 @@ fn encode(in_file: &String, out_file: &String) {
         let line: Rec = record.unwrap();
 
         let field = to_field(line.typ, line.value);
-        info!("{:?}", field);
+        info!("{}", field);
 
         write_out(&mut output, field);
     }
@@ -144,16 +295,17 @@ fn encode(in_file: &String, out_file: &String) {
     info!("Finished writing to {}", &out_file);
 }
 
-fn decode(in_file: &String, out_file: &String, template_file: &String) {
-    let mut input;
+fn decode(in_file: &String, out_file: &String, template_file: &String, repetitions: usize) {
+    let mut input_file;
 
     match File::open(&in_file) {
-        Ok(file_handle) => input = file_handle,
+        Ok(file_handle) => input_file = file_handle,
         Err(_) => {
             error!("Could not open input file '{}'!", &in_file);
             return;
         },
     }
+    let mut input = BufReader::new(input_file);
 
     let template;
     match File::open(&template_file) {
@@ -180,14 +332,23 @@ fn decode(in_file: &String, out_file: &String, template_file: &String) {
         },
     }
 
+    output.write_all(&"typ,description,value\n".to_string().as_bytes());
     // NOTE parse manually to provide better error messages
+    let mut templates = vec!();
     for record in lines.deserialize() {
         let template: Template = record.unwrap();
+        templates.push(template);
+    }
 
-        let field = read_field(&mut input, &template);
-        info!("{:?}", field);
+    for _ in 0..repetitions {
+        for template in templates.iter() {
+            let field = read_field(&mut input, &template);
+            info!("{}", field);
 
-        write_field(&mut output, &field, &template.description);
+            write_field(&mut output, &field, &template.description);
+
+            output.write_all(&b"\n"[..]);
+        }
     }
 
     info!("Finished writing to {}", &out_file);
@@ -203,8 +364,8 @@ fn main() {
             encode(&in_file, &out_file);
         },
 
-        Opt::Decode { in_file, out_file, template_file } => {
-            decode(&in_file, &out_file, &template_file);
+        Opt::Decode { in_file, out_file, template_file, repetitions } => {
+            decode(&in_file, &out_file, &template_file, repetitions);
         },
     }
 

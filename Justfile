@@ -16,3 +16,4 @@ encode:
 
 decode:
   cargo run -- decode data.bin -t test.csv
+
