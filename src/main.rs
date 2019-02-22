@@ -82,6 +82,9 @@ enum Opt {
 
         #[structopt(short="o", long="output", default_value="data.bin")]
         out_file: String,
+
+        #[structopt(short="l", long="log-level", default_value="Level::info")]
+        log_level: Level,
      },
 
      #[structopt(name="decode")]
@@ -96,6 +99,9 @@ enum Opt {
 
         #[structopt(short="r", long="repeat", default_value="1")]
         repetitions: isize,
+
+        #[structopt(short="l", long="log-level", default_value="Level::info")]
+        log_level: Level,
      },
 }
 
@@ -491,14 +497,15 @@ fn decode(in_file: &String, out_file: &String, template_file: &String, repetitio
 fn main() {
     let opt = Opt::from_args();
 
-    loggerv::init_with_level(Level::Info).unwrap();
 
     match opt {
-        Opt::Encode { in_file, out_file } => {
+        Opt::Encode { in_file, out_file, log_level} => {
+            loggerv::init_with_level(log_level).unwrap();
             encode(&in_file, &out_file);
         },
 
-        Opt::Decode { in_file, out_file, template_file, repetitions } => {
+        Opt::Decode { in_file, out_file, template_file, repetitions, log_level } => {
+            loggerv::init_with_level(log_level).unwrap();
             decode(&in_file, &out_file, &template_file, repetitions);
         },
     }
