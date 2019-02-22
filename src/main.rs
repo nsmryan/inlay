@@ -1,10 +1,13 @@
+#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate serde_derive;
+extern crate regex;
 extern crate csv;
 extern crate byteorder;
 #[macro_use] extern crate structopt;
 #[macro_use]
 extern crate log;
 extern crate loggerv;
+extern crate bitstream_io;
 
 
 use std::io::{Read, Write};
@@ -17,6 +20,8 @@ use structopt::StructOpt;
 
 use loggerv::*;
 use log::{Level};
+
+use regex::Regex;
 
 mod types;
 use types::*;
@@ -49,209 +54,194 @@ enum Opt {
 }
 
 
-fn to_field(typ: FieldType, value_str: String) -> Field {
+fn to_field(typ: FieldType, value_str: &str, description: String) -> Field {
     let value = to_value(typ, value_str);
     Field {
         value: value,
         endianness: typ.endianness(),
         typ: typ,
-        description: "".to_string(),
+        description: description,
     }
 }
 
-fn to_value(typ: FieldType, value_str: String) -> Value {
+fn to_value(typ: FieldType, value_str: &str) -> Value {
   match typ {
-    FieldType::uint8_be | FieldType::uint8_le =>
-        Value::Uint8(value_str.parse().ok().unwrap()),
-    FieldType::int8_be | FieldType::int8_le =>
-        Value::Int8(value_str.parse().ok().unwrap()),
-    FieldType::uint16_be | FieldType::uint16_le =>
-        Value::Uint16(value_str.parse().ok().unwrap()),
-    FieldType::int16_be | FieldType::int16_le =>
-        Value::Int16(value_str.parse().ok().unwrap()),
-    FieldType::uint32_be | FieldType::uint32_le =>
-        Value::Uint32(value_str.parse().ok().unwrap()),
-    FieldType::int32_be | FieldType::int32_le =>
-        Value::Int32(value_str.parse().ok().unwrap()),
-    FieldType::float_be | FieldType::float_le =>
-        Value::Float(value_str.parse().ok().unwrap()),
-    FieldType::double_be | FieldType::double_le =>
-        Value::Double(value_str.parse().ok().unwrap()),
+    FieldType::Int(num_bits, _) => {
+        if num_bits <= 8 {
+            Value::Uint8(value_str.parse().ok().unwrap())
+        } else if num_bits <= 16 {
+            Value::Uint16(value_str.parse().ok().unwrap())
+        } else if num_bits <= 32 {
+            Value::Uint32(value_str.parse().ok().unwrap())
+        } else if num_bits <= 64 {
+            Value::Uint64(value_str.parse().ok().unwrap())
+        } else {
+            panic!("{} bit fields are not allowed!", num_bits);
+        }
+    },
+
+    FieldType::Uint(num_bits, _) => {
+        if num_bits <= 8 {
+            Value::Int8(value_str.parse().ok().unwrap())
+        } else if num_bits <= 16 {
+            Value::Int16(value_str.parse().ok().unwrap())
+        } else if num_bits <= 32 {
+            Value::Int32(value_str.parse().ok().unwrap())
+        } else if num_bits <= 64 {
+            Value::Int64(value_str.parse().ok().unwrap())
+        } else {
+            panic!("{} bit fields are not allowed!", num_bits);
+        }
+    },
+
+    FieldType::Float(_) => {
+        Value::Float(value_str.parse().ok().unwrap())
+    },
+
+    FieldType::Double(_) => {
+        Value::Double(value_str.parse().ok().unwrap())
+    },
   }
 }
 
-fn write_out<O: Write>(output: &mut O, field: Field) {
+fn write_out<R>(reader: &mut R, field: &Field, endianness: &Endianness)
+    where R: Read + WriteBytesExt {
+
     match field.endianness {
         Endianness::Big => {
           match field.value {
-            Value::Uint8(val) => { output.write(&[val]).ok(); },
-            Value::Int8(val) => { output.write(&[val as u8]).ok(); },
-            Value::Uint16(val) => { output.write_u16::<BigEndian>(val).ok(); },
-            Value::Int16(val) => { output.write_i16::<BigEndian>(val).ok(); },
-            Value::Uint32(val) => { output.write_u32::<BigEndian>(val).ok(); },
-            Value::Int32(val) => { output.write_i32::<BigEndian>(val).ok(); },
-            Value::Float(val) => { output.write_f32::<BigEndian>(val).ok(); },
-            Value::Double(val) => { output.write_f64::<BigEndian>(val).ok(); },
+            Value::Uint8(val) => { reader.write(&[val]).ok(); },
+            Value::Int8(val) => { reader.write(&[val as u8]).ok(); },
+            Value::Uint16(val) => { reader.write_u16::<BigEndian>(val).ok(); },
+            Value::Int16(val) => { reader.write_i16::<BigEndian>(val).ok(); },
+            Value::Uint32(val) => { reader.write_u32::<BigEndian>(val).ok(); },
+            Value::Int32(val) => { reader.write_i32::<BigEndian>(val).ok(); },
+            Value::Uint64(val) => { reader.write_u64::<BigEndian>(val).ok(); },
+            Value::Int64(val) => { reader.write_i64::<BigEndian>(val).ok(); },
+            Value::Float(val) => { reader.write_f32::<BigEndian>(val).ok(); },
+            Value::Double(val) => { reader.write_f64::<BigEndian>(val).ok(); },
           }
         },
 
         Endianness::Little => {
           match field.value {
-            Value::Uint8(val) => { output.write(&[val]).ok(); },
-            Value::Int8(val) => { output.write(&[val as u8]).ok(); },
-            Value::Uint16(val) => { output.write_u16::<LittleEndian>(val).ok(); },
-            Value::Int16(val) => { output.write_i16::<LittleEndian>(val).ok(); },
-            Value::Uint32(val) => { output.write_u32::<LittleEndian>(val).ok(); },
-            Value::Int32(val) => { output.write_i32::<LittleEndian>(val).ok(); },
-            Value::Float(val) => { output.write_f32::<LittleEndian>(val).ok(); },
-            Value::Double(val) => { output.write_f64::<LittleEndian>(val).ok(); },
+            Value::Uint8(val) => { reader.write(&[val]).ok(); },
+            Value::Int8(val) => { reader.write(&[val as u8]).ok(); },
+            Value::Uint16(val) => { reader.write_u16::<LittleEndian>(val).ok(); },
+            Value::Int16(val) => { reader.write_i16::<LittleEndian>(val).ok(); },
+            Value::Uint32(val) => { reader.write_u32::<LittleEndian>(val).ok(); },
+            Value::Int32(val) => { reader.write_i32::<LittleEndian>(val).ok(); },
+            Value::Uint64(val) => { reader.write_u64::<LittleEndian>(val).ok(); },
+            Value::Int64(val) => { reader.write_i64::<LittleEndian>(val).ok(); },
+            Value::Float(val) => { reader.write_f32::<LittleEndian>(val).ok(); },
+            Value::Double(val) => { reader.write_f64::<LittleEndian>(val).ok(); },
           }
         },
     }
 }
 
-fn read_field<R: ReadBytesExt>(reader: &mut R, template: &Template) -> Field {
+fn read_field<R>(reader: &mut R, template: &Template) -> Field
+    where R: ReadBytesExt {
     match template.typ {
-        FieldType::uint8_be => {
+        FieldType::Int(num_bits, endianness) => {
+            let value;
+            if endianness == Endianness::Little {
+                if num_bits <= 8 {
+                    value = Value::Uint8(reader.read_u8().unwrap());
+                } else if num_bits <= 16 {
+                    value = Value::Uint16(reader.read_u16::<LittleEndian>().unwrap());
+                } else if num_bits <= 32 {
+                    value = Value::Uint32(reader.read_u32::<LittleEndian>().unwrap());
+                } else if num_bits <= 64 {
+                    value = Value::Uint64(reader.read_u64::<LittleEndian>().unwrap());
+                } else {
+                    panic!("{} bits in a field are not supported!");
+                }
+            } else {
+                if num_bits <= 8 {
+                    value = Value::Uint8(reader.read_u8().unwrap());
+                } else if num_bits <= 16 {
+                    value = Value::Uint16(reader.read_u16::<BigEndian>().unwrap());
+                } else if num_bits <= 32 {
+                    value = Value::Uint32(reader.read_u32::<BigEndian>().unwrap());
+                } else if num_bits <= 64 {
+                    value = Value::Uint64(reader.read_u64::<BigEndian>().unwrap());
+                } else {
+                    panic!("{} bits in a field are not supported!");
+                }
+            }
+
             Field {
-                value: Value::Uint8(reader.read_u8().unwrap()),
-                endianness: Endianness::Big,
+                value: value,
+                endianness: endianness,
                 typ: template.typ,
                 description: template.description.clone(),
             }
         },
 
-        FieldType::int8_be => {
+        FieldType::Uint(num_bits, endianness) => {
+            let value;
+            if endianness == Endianness::Little {
+                if num_bits <= 8 {
+                    value = Value::Int8(reader.read_i8().unwrap());
+                } else if num_bits <= 16 {
+                    value = Value::Int16(reader.read_i16::<LittleEndian>().unwrap());
+                } else if num_bits <= 32 {
+                    value = Value::Int32(reader.read_i32::<LittleEndian>().unwrap());
+                } else if num_bits <= 64 {
+                    value = Value::Int64(reader.read_i64::<LittleEndian>().unwrap());
+                } else {
+                    panic!("{} bits in a field are not supported!");
+                }
+            } else {
+                if num_bits <= 8 {
+                    value = Value::Int8(reader.read_i8().unwrap());
+                } else if num_bits <= 16 {
+                    value = Value::Int16(reader.read_i16::<BigEndian>().unwrap());
+                } else if num_bits <= 32 {
+                    value = Value::Int32(reader.read_i32::<BigEndian>().unwrap());
+                } else if num_bits <= 64 {
+                    value = Value::Int64(reader.read_i64::<BigEndian>().unwrap());
+                } else {
+                    panic!("{} bits in a field are not supported!");
+                }
+            }
+
             Field {
-                value: Value::Int8(reader.read_i8().unwrap()),
-                endianness: Endianness::Big,
+                value: value,
+                endianness: endianness,
                 typ: template.typ,
                 description: template.description.clone(),
             }
         },
 
-        FieldType::uint16_be => {
+        FieldType::Float(endianness) => {
+            let value;
+            if endianness == Endianness::Little {
+                value = Value::Float(reader.read_f32::<LittleEndian>().unwrap());
+            } else {
+                value = Value::Float(reader.read_f32::<BigEndian>().unwrap());
+            }
+
             Field {
-                value: Value::Uint16(reader.read_u16::<BigEndian>().unwrap()),
-                endianness: Endianness::Big,
+                value: value,
+                endianness: endianness,
                 typ: template.typ,
                 description: template.description.clone(),
             }
         },
 
-        FieldType::int16_be => {
-            Field {
-                value: Value::Int16(reader.read_i16::<BigEndian>().unwrap()),
-                endianness: Endianness::Big,
-                typ: template.typ,
-                description: template.description.clone(),
+        FieldType::Double(endianness) => {
+            let value;
+            if endianness == Endianness::Little {
+                value = Value::Double(reader.read_f64::<LittleEndian>().unwrap());
+            } else {
+                value = Value::Double(reader.read_f64::<BigEndian>().unwrap());
             }
-        },
 
-        FieldType::uint32_be => {
             Field {
-                value: Value::Uint32(reader.read_u32::<BigEndian>().unwrap()),
-                endianness: Endianness::Big,
-                typ: template.typ,
-                description: template.description.clone(),
-            }
-        },
-
-        FieldType::int32_be => {
-            Field {
-                value: Value::Int32(reader.read_i32::<BigEndian>().unwrap()),
-                endianness: Endianness::Big,
-                typ: template.typ,
-                description: template.description.clone(),
-            }
-        },
-
-        FieldType::float_be => {
-            Field {
-                value: Value::Float(reader.read_f32::<BigEndian>().unwrap()),
-                endianness: Endianness::Big,
-                typ: template.typ,
-                description: template.description.clone(),
-            }
-        },
-
-        FieldType::double_be => {
-            Field {
-                value: Value::Double(reader.read_f64::<BigEndian>().unwrap()),
-                endianness: Endianness::Big,
-                typ: template.typ,
-                description: template.description.clone(),
-            }
-        },
-
-
-        FieldType::uint8_le => {
-            Field {
-                value: Value::Uint8(reader.read_u8().unwrap()),
-                endianness: Endianness::Little,
-                typ: template.typ,
-                description: template.description.clone(),
-            }
-        },
-
-        FieldType::int8_le => {
-            Field {
-                value: Value::Int8(reader.read_i8().unwrap()),
-                endianness: Endianness::Little,
-                typ: template.typ,
-                description: template.description.clone(),
-            }
-        },
-
-        FieldType::uint16_le => {
-            Field {
-                value: Value::Uint16(reader.read_u16::<LittleEndian>().unwrap()),
-                endianness: Endianness::Little,
-                typ: template.typ,
-                description: template.description.clone(),
-            }
-        },
-
-        FieldType::int16_le => {
-            Field {
-                value: Value::Int16(reader.read_i16::<LittleEndian>().unwrap()),
-                endianness: Endianness::Little,
-                typ: template.typ,
-                description: template.description.clone(),
-            }
-        },
-
-        FieldType::uint32_le => {
-            Field {
-                value: Value::Uint32(reader.read_u32::<LittleEndian>().unwrap()),
-                endianness: Endianness::Little,
-                typ: template.typ,
-                description: template.description.clone(),
-            }
-        },
-
-        FieldType::int32_le => {
-            Field {
-                value: Value::Int32(reader.read_i32::<LittleEndian>().unwrap()),
-                endianness: Endianness::Little,
-                typ: template.typ,
-                description: template.description.clone(),
-            }
-        },
-
-        FieldType::float_le => {
-            Field {
-                value: Value::Float(reader.read_f32::<LittleEndian>().unwrap()),
-                endianness: Endianness::Little,
-                typ: template.typ,
-                description: template.description.clone(),
-            }
-        },
-
-        FieldType::double_le => {
-            Field {
-                value: Value::Double(reader.read_f64::<LittleEndian>().unwrap()),
-                endianness: Endianness::Little,
+                value: value,
+                endianness: endianness,
                 typ: template.typ,
                 description: template.description.clone(),
             }
@@ -261,6 +251,82 @@ fn read_field<R: ReadBytesExt>(reader: &mut R, template: &Template) -> Field {
 
 fn write_field<W: Write>(writer: &mut W, field: &Field, description: &String) {
     writer.write_all(&field.to_record().as_bytes());
+}
+
+fn parse_typ(typ_str: &str) -> Option<FieldType> {
+    let typ_str = typ_str.to_lowercase();
+
+    lazy_static! {
+      static ref TYPE_REGEX: Regex =
+          Regex::new(r"(float|double|int|uint)(\d{0,2})_(be|le)").unwrap();
+    }
+    let matches = TYPE_REGEX.captures(&typ_str).unwrap();
+
+    match &matches[1] {
+        "uint" => {
+            let num_bits = matches[2].parse::<NumBits>().unwrap();
+
+            match &matches[3] {
+                "be" => Some(FieldType::Uint(num_bits, Endianness::Big)),
+
+                "le" => Some(FieldType::Uint(num_bits, Endianness::Little)),
+
+                 _ => {
+                     error!("Endianness '{}' not expected!", &matches[3]);
+                     None
+                 },
+            }
+        },
+
+        "int" => {
+            let num_bits = matches[2].parse::<NumBits>().unwrap();
+
+            match &matches[3] {
+                "be" => Some(FieldType::Int(num_bits, Endianness::Big)),
+
+                "le" => Some(FieldType::Int(num_bits, Endianness::Little)),
+
+                 _ => {
+                     error!("Endianness '{}' not expected!", &matches[3]);
+                     None
+                 },
+            }
+        },
+
+        "float" => {
+            // NOTE should check that no bit size is given
+            match &matches[3] {
+                "be" => Some(FieldType::Float(Endianness::Big)),
+
+                "le" => Some(FieldType::Float(Endianness::Little)),
+
+                 _ => {
+                     error!("Endianness '{}' not expected!", &matches[3]);
+                     None
+                 },
+            }
+        },
+
+        "double" => {
+            // NOTE should check that no bit size is given
+            match &matches[3] {
+                "be" => Some(FieldType::Double(Endianness::Big)),
+
+                "le" => Some(FieldType::Double(Endianness::Little)),
+
+                 _ => {
+                     error!("Endianness '{}' not expected!", &matches[3]);
+                     None
+                 },
+            }
+        },
+
+        _ => {
+            dbg!(&matches);
+            error!("Type '{}' unexpected in field type '{}'", &matches[1], typ_str);
+            None
+        }
+    }
 }
 
 fn encode(in_file: &String, out_file: &String) {
@@ -282,14 +348,21 @@ fn encode(in_file: &String, out_file: &String) {
 
     let mut output = File::create(&out_file).unwrap();
 
-    // NOTE parse manually to provide better error messages
-    for record in lines.deserialize() {
-        let line: Rec = record.unwrap();
+    let mut endianness = Endianness::Big;
 
-        let field = to_field(line.typ, line.value);
+    for record in lines.records() {
+        let mut rec = record.unwrap();
+
+        let typ_str = &rec[0];
+        let description = &rec[1];
+        let value_str = &rec[2];
+
+        let typ = parse_typ(typ_str).unwrap();
+
+        let field = to_field(typ, value_str, description.to_string());
         info!("{}", field);
 
-        write_out(&mut output, field);
+        write_out(&mut output, &field, &field.endianness);
     }
 
     info!("Finished writing to {}", &out_file);
@@ -334,9 +407,16 @@ fn decode(in_file: &String, out_file: &String, template_file: &String, repetitio
 
     output.write_all(&"typ,description,value\n".to_string().as_bytes());
     // NOTE parse manually to provide better error messages
-    let mut templates = vec!();
-    for record in lines.deserialize() {
-        let template: Template = record.unwrap();
+    let mut templates: Vec<Template> = vec!();
+    for record in lines.records() {
+        let mut rec = record.unwrap();
+
+        let template: Template =
+            Template {
+                typ: parse_typ(&rec[0]).unwrap(),
+                description: rec[1].to_string(),
+            };
+
         templates.push(template);
     }
 

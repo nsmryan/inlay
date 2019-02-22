@@ -1,4 +1,10 @@
 
+build: 
+  cargo build
+
+rebuild:
+  cargo watch -x build
+
 run: 
   cargo run
 
