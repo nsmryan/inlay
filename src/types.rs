@@ -5,6 +5,9 @@ use std::fmt;
 /// Rename usize for clarity when dealing with a number of bits.
 pub type NumBits = usize;
 
+/// Rename usize for clarity when dealing with a number of bytes.
+pub type NumBytes = usize;
+
 /// A field type describes a primitive binary object- either
 /// a signed integer, an unsigned integer, or a floating point
 /// number (f32 or f64).
@@ -12,10 +15,10 @@ pub type NumBits = usize;
 #[derive(Eq, PartialEq, Debug, Copy, Clone, Deserialize)]
 pub enum FieldType {
     /// Signed integers
-    Int(NumBits, Endianness),
+    Int(NumBits, Endianness, Option<NumBytes>),
 
     /// Unsigned integers
-    Uint(NumBits, Endianness),
+    Uint(NumBits, Endianness, Option<NumBytes>),
 
     /// Single Precision Float
     Float(Endianness),
@@ -27,17 +30,29 @@ pub enum FieldType {
 impl fmt::Display for FieldType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-          FieldType::Int(num_bits, endianness) =>
-              write!(f, "int{}_{}", num_bits, endianness.to_string()),
+          FieldType::Int(num_bits, endianness, num_bytes) => {
+              write!(f, "int{}_{}", num_bits, endianness.to_string());
+              match num_bytes {
+                  None => (),
+                  Some(bytes) => write!(f, ":{}", bytes),
+              }
+          },
 
-          FieldType::Uint(num_bits, endianness) =>
-              write!(f, "uint{}_{}", num_bits, endianness.to_string()),
+          FieldType::Uint(num_bits, endianness, num_bytes) => {
+              write!(f, "uint{}_{}", num_bits, endianness.to_string());
+              match num_bytes {
+                  None => (),
+                  Some(bytes) => write!(f, ":{}", bytes),
+              }
+          },
 
-          FieldType::Float(endianness) =>
-              write!(f, "float_{}", endianness.to_string()),
+          FieldType::Float(endianness) => {
+              write!(f, "float_{}", endianness.to_string());
+          },
 
-          FieldType::Double(endianness) =>
-              write!(f, "double_{}", endianness.to_string()),
+          FieldType::Double(endianness) => {
+              write!(f, "double_{}", endianness.to_string());
+          },
         }
     }
 }
@@ -46,9 +61,9 @@ impl FieldType {
     /// Get the endianness of a FieldType
     pub fn endianness(&self) -> Endianness {
         match self {
-          FieldType::Int(_, endianness) => *endianness,
+          FieldType::Int(_, endianness, _) => *endianness,
 
-          FieldType::Uint(_, endianness) => *endianness,
+          FieldType::Uint(_, endianness, _) => *endianness,
 
           FieldType::Float(endianness) => *endianness,
 
@@ -128,7 +143,6 @@ impl Endianness {
 #[derive(PartialEq, Debug, Clone)]
 pub struct Field {
     pub value: Value,
-    pub endianness: Endianness,
     pub typ: FieldType,
     pub description: String,
 }

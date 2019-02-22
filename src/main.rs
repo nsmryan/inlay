@@ -14,7 +14,7 @@
 /// uint32_be,field3,1245
 ///
 ///
-/// The header must have fields typ, description, and value, in that order. The types
+/// The header must have fields type, description, and value, in that order. The types
 /// are given by the following regex:
 /// (uint8|uint16|uint32|uint64|int8|int16|int32|int64|float|double)_(be|le)
 ///
@@ -110,7 +110,6 @@ fn to_field(typ: FieldType, value_str: &str, description: String) -> Field {
     let value = to_value(typ, value_str);
     Field {
         value: value,
-        endianness: typ.endianness(),
         typ: typ,
         description: description,
     }
@@ -159,7 +158,7 @@ fn to_value(typ: FieldType, value_str: &str) -> Value {
 fn write_out<R>(reader: &mut R, field: &Field, endianness: &Endianness)
     where R: Read + WriteBytesExt {
 
-    match field.endianness {
+    match field.typ.endianness() {
         Endianness::Big => {
           match field.value {
             Value::Uint8(val) => { reader.write(&[val]).ok(); },
@@ -225,7 +224,6 @@ fn read_field<R>(reader: &mut R, template: &Template) -> Option<Field>
 
             Some(Field {
                 value: value,
-                endianness: endianness,
                 typ: template.typ,
                 description: template.description.clone(),
             })
@@ -261,7 +259,6 @@ fn read_field<R>(reader: &mut R, template: &Template) -> Option<Field>
 
             Some(Field {
                 value: value,
-                endianness: endianness,
                 typ: template.typ,
                 description: template.description.clone(),
             })
@@ -277,7 +274,6 @@ fn read_field<R>(reader: &mut R, template: &Template) -> Option<Field>
 
             Some(Field {
                 value: value,
-                endianness: endianness,
                 typ: template.typ,
                 description: template.description.clone(),
             })
@@ -293,7 +289,6 @@ fn read_field<R>(reader: &mut R, template: &Template) -> Option<Field>
 
             Some(Field {
                 value: value,
-                endianness: endianness,
                 typ: template.typ,
                 description: template.description.clone(),
             })
@@ -414,7 +409,7 @@ fn encode(in_file: &String, out_file: &String) -> Option<()> {
         let field = to_field(typ, value_str, description.to_string());
         info!("{}", field);
 
-        write_out(&mut output, &field, &field.endianness);
+        write_out(&mut output, &field, &field.typ.endianness());
     }
 
     info!("Finished writing to {}", &out_file);
