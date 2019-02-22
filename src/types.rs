@@ -2,18 +2,48 @@ use byteorder::{LittleEndian, BigEndian, ByteOrder, WriteBytesExt};
 use std::fmt;
 
 
+/// Rename usize for clarity when dealing with a number of bits.
 pub type NumBits = usize;
 
+/// A field type describes a primitive binary object- either
+/// a signed integer, an unsigned integer, or a floating point
+/// number (f32 or f64).
 #[allow(non_camel_case_types)]
 #[derive(Eq, PartialEq, Debug, Copy, Clone, Deserialize)]
 pub enum FieldType {
+    /// Signed integers
     Int(NumBits, Endianness),
+
+    /// Unsigned integers
     Uint(NumBits, Endianness),
+
+    /// Single Precision Float
     Float(Endianness),
+
+    /// Double Precision Float
     Double(Endianness),
 }
 
+impl fmt::Display for FieldType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+          FieldType::Int(num_bits, endianness) =>
+              write!(f, "int{}_{}", num_bits, endianness.to_string()),
+
+          FieldType::Uint(num_bits, endianness) =>
+              write!(f, "uint{}_{}", num_bits, endianness.to_string()),
+
+          FieldType::Float(endianness) =>
+              write!(f, "float_{}", endianness.to_string()),
+
+          FieldType::Double(endianness) =>
+              write!(f, "double_{}", endianness.to_string()),
+        }
+    }
+}
+
 impl FieldType {
+    /// Get the endianness of a FieldType
     pub fn endianness(&self) -> Endianness {
         match self {
           FieldType::Int(_, endianness) => *endianness,
@@ -25,20 +55,11 @@ impl FieldType {
           FieldType::Double(endianness) => *endianness,
         }
     }
-
-    fn to_string(&self) -> String {
-        match self {
-          FieldType::Int(num_bits, endianness) => format!("int{}_{}", num_bits, endianness.to_string()),
-
-          FieldType::Uint(num_bits, endianness) => format!("uint{}_{}", num_bits, endianness.to_string()),
-
-          FieldType::Float(endianness) => format!("float_{}", endianness.to_string()),
-
-          FieldType::Double(endianness) => format!("double_{}", endianness.to_string()),
-        }
-    }
 }
 
+/// A value is a primitive binary object.
+/// These can be 8/16/32/64 bit signed/unsigned integers,
+/// of single/double precision floats.
 #[derive(PartialEq, Debug, Copy, Clone, Deserialize)]
 pub enum Value {
   Uint8(u8),
@@ -85,6 +106,7 @@ impl Value {
   }
 }
 
+/// Endianness as an enum
 #[derive(Eq, PartialEq, Debug, Copy, Clone, Deserialize)]
 pub enum Endianness {
     Little,
@@ -100,6 +122,9 @@ impl Endianness {
     }
 }
 
+/// A Field is a single entry in a binary file. It consists
+/// of the value at a location, a type giving extra information like
+/// the endianness and bitwidgth, and a description.
 #[derive(PartialEq, Debug, Clone)]
 pub struct Field {
     pub value: Value,
@@ -120,13 +145,9 @@ impl fmt::Display for Field {
     }
 }
 
-#[derive(Eq, PartialEq, Debug, Clone, Deserialize)]
-pub struct Rec {
-  pub typ: FieldType,
-  pub value: String,
-  pub description: String,
-}
-
+/// A template gives enough information to decode a field from a binary file,
+/// providing the type information used for decoding as well as a description of the
+/// field.
 #[derive(Eq, PartialEq, Debug, Clone, Deserialize)]
 pub struct Template {
   pub typ: FieldType,

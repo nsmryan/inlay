@@ -1,3 +1,49 @@
+///
+/// Inlay
+///
+/// This program provides a very simple translation from binary data to csv, and csv
+/// to binary data. It is intended for working with trivial binary formats, and especially
+/// for initial testing and development while there may not be tools specific to the format
+/// to use.
+///
+/// CSV -> Binary
+/// When building a binary file, a csv file in the following format must be provided:
+/// type,description,value
+/// uint8_be,field1,1
+/// uint16_be,field2,141
+/// uint32_be,field3,1245
+///
+///
+/// The header must have fields typ, description, and value, in that order. The types
+/// are given by the following regex:
+/// (uint8|uint16|uint32|uint64|int8|int16|int32|int64|float|double)_(be|le)
+///
+/// Any field can be big endian or little endian, allowing mixed endianness within
+/// a file.
+///
+/// Binary -> CSV
+/// When translating binary to CSV, a file of the following format must be provided:
+/// type,description
+/// uint64_be,a 64 bit field
+/// uint8_be,an 8 bit field
+///
+/// This file must have a header "type,description" and any number of entries with
+/// a type as defined above. The description is optional and will be copied into the
+/// output csv file.
+///
+/// The output csv file is in exactly the same format as the input csv file when 
+/// encoding from CSV -> Binary. This means that a binary structure can be decoded,
+/// modified and written back.
+/// To assist with this use case, if the "template" file given during decoding has
+/// a "values" column it will be ignored. This allows a csv file from decoding to be used as the
+/// template when decoding other instances of a binary structure.
+///
+///
+/// When decoding, a file many have many entries. The command line options allow repetitions
+/// of a certain number of repeated structures, or as many as necessary to read the whole file.
+/// Structopt seems to require the flag "-r=-1" rather then "-r -1" when specifying negative
+/// numbers.
+///
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate serde_derive;
 extern crate regex;
@@ -49,7 +95,7 @@ enum Opt {
         template_file: String,
 
         #[structopt(short="r", long="repeat", default_value="1")]
-        repetitions: usize,
+        repetitions: isize,
      },
 }
 
@@ -140,18 +186,18 @@ fn write_out<R>(reader: &mut R, field: &Field, endianness: &Endianness)
     }
 }
 
-fn read_field<R>(reader: &mut R, template: &Template) -> Field
+fn read_field<R>(reader: &mut R, template: &Template) -> Option<Field>
     where R: ReadBytesExt {
     match template.typ {
         FieldType::Int(num_bits, endianness) => {
             let value;
             if endianness == Endianness::Little {
                 if num_bits <= 8 {
-                    value = Value::Uint8(reader.read_u8().unwrap());
+                    value = Value::Uint8(reader.read_u8().ok()?);
                 } else if num_bits <= 16 {
-                    value = Value::Uint16(reader.read_u16::<LittleEndian>().unwrap());
+                    value = Value::Uint16(reader.read_u16::<LittleEndian>().ok()?);
                 } else if num_bits <= 32 {
-                    value = Value::Uint32(reader.read_u32::<LittleEndian>().unwrap());
+                    value = Value::Uint32(reader.read_u32::<LittleEndian>().ok()?);
                 } else if num_bits <= 64 {
                     value = Value::Uint64(reader.read_u64::<LittleEndian>().unwrap());
                 } else {
@@ -159,92 +205,92 @@ fn read_field<R>(reader: &mut R, template: &Template) -> Field
                 }
             } else {
                 if num_bits <= 8 {
-                    value = Value::Uint8(reader.read_u8().unwrap());
+                    value = Value::Uint8(reader.read_u8().ok()?);
                 } else if num_bits <= 16 {
-                    value = Value::Uint16(reader.read_u16::<BigEndian>().unwrap());
+                    value = Value::Uint16(reader.read_u16::<BigEndian>().ok()?);
                 } else if num_bits <= 32 {
-                    value = Value::Uint32(reader.read_u32::<BigEndian>().unwrap());
+                    value = Value::Uint32(reader.read_u32::<BigEndian>().ok()?);
                 } else if num_bits <= 64 {
-                    value = Value::Uint64(reader.read_u64::<BigEndian>().unwrap());
+                    value = Value::Uint64(reader.read_u64::<BigEndian>().ok()?);
                 } else {
                     panic!("{} bits in a field are not supported!");
                 }
             }
 
-            Field {
+            Some(Field {
                 value: value,
                 endianness: endianness,
                 typ: template.typ,
                 description: template.description.clone(),
-            }
+            })
         },
 
         FieldType::Uint(num_bits, endianness) => {
             let value;
             if endianness == Endianness::Little {
                 if num_bits <= 8 {
-                    value = Value::Int8(reader.read_i8().unwrap());
+                    value = Value::Int8(reader.read_i8().ok()?);
                 } else if num_bits <= 16 {
-                    value = Value::Int16(reader.read_i16::<LittleEndian>().unwrap());
+                    value = Value::Int16(reader.read_i16::<LittleEndian>().ok()?);
                 } else if num_bits <= 32 {
-                    value = Value::Int32(reader.read_i32::<LittleEndian>().unwrap());
+                    value = Value::Int32(reader.read_i32::<LittleEndian>().ok()?);
                 } else if num_bits <= 64 {
-                    value = Value::Int64(reader.read_i64::<LittleEndian>().unwrap());
+                    value = Value::Int64(reader.read_i64::<LittleEndian>().ok()?);
                 } else {
                     panic!("{} bits in a field are not supported!");
                 }
             } else {
                 if num_bits <= 8 {
-                    value = Value::Int8(reader.read_i8().unwrap());
+                    value = Value::Int8(reader.read_i8().ok()?);
                 } else if num_bits <= 16 {
-                    value = Value::Int16(reader.read_i16::<BigEndian>().unwrap());
+                    value = Value::Int16(reader.read_i16::<BigEndian>().ok()?);
                 } else if num_bits <= 32 {
-                    value = Value::Int32(reader.read_i32::<BigEndian>().unwrap());
+                    value = Value::Int32(reader.read_i32::<BigEndian>().ok()?);
                 } else if num_bits <= 64 {
-                    value = Value::Int64(reader.read_i64::<BigEndian>().unwrap());
+                    value = Value::Int64(reader.read_i64::<BigEndian>().ok()?);
                 } else {
                     panic!("{} bits in a field are not supported!");
                 }
             }
 
-            Field {
+            Some(Field {
                 value: value,
                 endianness: endianness,
                 typ: template.typ,
                 description: template.description.clone(),
-            }
+            })
         },
 
         FieldType::Float(endianness) => {
             let value;
             if endianness == Endianness::Little {
-                value = Value::Float(reader.read_f32::<LittleEndian>().unwrap());
+                value = Value::Float(reader.read_f32::<LittleEndian>().ok()?);
             } else {
-                value = Value::Float(reader.read_f32::<BigEndian>().unwrap());
+                value = Value::Float(reader.read_f32::<BigEndian>().ok()?);
             }
 
-            Field {
+            Some(Field {
                 value: value,
                 endianness: endianness,
                 typ: template.typ,
                 description: template.description.clone(),
-            }
+            })
         },
 
         FieldType::Double(endianness) => {
             let value;
             if endianness == Endianness::Little {
-                value = Value::Double(reader.read_f64::<LittleEndian>().unwrap());
+                value = Value::Double(reader.read_f64::<LittleEndian>().ok()?);
             } else {
-                value = Value::Double(reader.read_f64::<BigEndian>().unwrap());
+                value = Value::Double(reader.read_f64::<BigEndian>().ok()?);
             }
 
-            Field {
+            Some(Field {
                 value: value,
                 endianness: endianness,
                 typ: template.typ,
                 description: template.description.clone(),
-            }
+            })
         },
     }
 }
@@ -260,11 +306,11 @@ fn parse_typ(typ_str: &str) -> Option<FieldType> {
       static ref TYPE_REGEX: Regex =
           Regex::new(r"(float|double|int|uint)(\d{0,2})_(be|le)").unwrap();
     }
-    let matches = TYPE_REGEX.captures(&typ_str).unwrap();
+    let matches = TYPE_REGEX.captures(&typ_str)?;
 
     match &matches[1] {
         "uint" => {
-            let num_bits = matches[2].parse::<NumBits>().unwrap();
+            let num_bits = matches[2].parse::<NumBits>().ok()?;
 
             match &matches[3] {
                 "be" => Some(FieldType::Uint(num_bits, Endianness::Big)),
@@ -279,7 +325,7 @@ fn parse_typ(typ_str: &str) -> Option<FieldType> {
         },
 
         "int" => {
-            let num_bits = matches[2].parse::<NumBits>().unwrap();
+            let num_bits = matches[2].parse::<NumBits>().ok()?;
 
             match &matches[3] {
                 "be" => Some(FieldType::Int(num_bits, Endianness::Big)),
@@ -329,14 +375,14 @@ fn parse_typ(typ_str: &str) -> Option<FieldType> {
     }
 }
 
-fn encode(in_file: &String, out_file: &String) {
+fn encode(in_file: &String, out_file: &String) -> Option<()> {
     let file;
 
     match File::open(&in_file) {
         Ok(file_handle) => file = file_handle,
         Err(_) => {
             error!("Could not open input file '{}'!", &in_file);
-            return;
+            return Some(());
         },
     }
 
@@ -344,20 +390,20 @@ fn encode(in_file: &String, out_file: &String) {
 
     let mut lines = csv::Reader::from_reader(file);
 
-    let header_line = lines.headers().unwrap();
+    let header_line = lines.headers().ok()?;
 
-    let mut output = File::create(&out_file).unwrap();
+    let mut output = File::create(&out_file).ok()?;
 
     let mut endianness = Endianness::Big;
 
     for record in lines.records() {
-        let mut rec = record.unwrap();
+        let mut rec = record.ok()?;
 
         let typ_str = &rec[0];
         let description = &rec[1];
         let value_str = &rec[2];
 
-        let typ = parse_typ(typ_str).unwrap();
+        let typ = parse_typ(typ_str)?;
 
         let field = to_field(typ, value_str, description.to_string());
         info!("{}", field);
@@ -366,16 +412,18 @@ fn encode(in_file: &String, out_file: &String) {
     }
 
     info!("Finished writing to {}", &out_file);
+
+    Some(())
 }
 
-fn decode(in_file: &String, out_file: &String, template_file: &String, repetitions: usize) {
+fn decode(in_file: &String, out_file: &String, template_file: &String, repetitions: isize) -> Option<()> {
     let mut input_file;
 
     match File::open(&in_file) {
         Ok(file_handle) => input_file = file_handle,
         Err(_) => {
             error!("Could not open input file '{}'!", &in_file);
-            return;
+            return Some(());
         },
     }
     let mut input = BufReader::new(input_file);
@@ -385,7 +433,7 @@ fn decode(in_file: &String, out_file: &String, template_file: &String, repetitio
         Ok(file_handle) => template = file_handle,
         Err(_) => {
             error!("Could not open template file '{}'!", &template_file);
-            return;
+            return Some(());
         },
     }
 
@@ -393,7 +441,7 @@ fn decode(in_file: &String, out_file: &String, template_file: &String, repetitio
 
     let mut lines = csv::Reader::from_reader(&template);
 
-    let header_line = lines.headers().unwrap();
+    let header_line = lines.headers().ok()?;
 
     // NOTE ensure good error messages here
     let mut output;
@@ -401,37 +449,43 @@ fn decode(in_file: &String, out_file: &String, template_file: &String, repetitio
         Ok(file_handle) => output = file_handle,
         Err(_) => {
             error!("Could not open output file '{}'!", &out_file);
-            return;
+            return Some(());
         },
     }
 
-    output.write_all(&"typ,description,value\n".to_string().as_bytes());
+    output.write_all(&"type,description,value\n".to_string().as_bytes());
     // NOTE parse manually to provide better error messages
     let mut templates: Vec<Template> = vec!();
     for record in lines.records() {
-        let mut rec = record.unwrap();
+        let mut rec = record.ok()?;
 
         let template: Template =
             Template {
-                typ: parse_typ(&rec[0]).unwrap(),
+                typ: parse_typ(&rec[0])?,
                 description: rec[1].to_string(),
             };
 
         templates.push(template);
     }
 
-    for _ in 0..repetitions {
+    let mut index = repetitions;
+    // negative numbers will repeat to end of file
+    while index != 0 {
         for template in templates.iter() {
-            let field = read_field(&mut input, &template);
+            let field = read_field(&mut input, &template)?;
             info!("{}", field);
 
             write_field(&mut output, &field, &template.description);
 
             output.write_all(&b"\n"[..]);
         }
+
+        index -= 1;
     }
 
     info!("Finished writing to {}", &out_file);
+
+    Some(())
 }
 
 fn main() {
