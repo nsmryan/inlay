@@ -305,14 +305,14 @@ fn write_field<W: Write>(writer: &mut W, field: &Field, description: &String) {
     writer.write_all(&field.to_record().as_bytes());
 }
 
-fn parse_typ(typ_str: &str) -> Option<FieldType> {
-    let typ_str = typ_str.to_lowercase();
+fn parse_type(type_str: &str) -> Option<FieldType> {
+    let type_str = type_str.to_lowercase();
 
     lazy_static! {
       static ref TYPE_REGEX: Regex =
           Regex::new(r"(float|double|int|uint)(\d{0,2})_(be|le)").unwrap();
     }
-    let matches = TYPE_REGEX.captures(&typ_str)?;
+    let matches = TYPE_REGEX.captures(&type_str)?;
 
     match &matches[1] {
         "uint" => {
@@ -375,7 +375,7 @@ fn parse_typ(typ_str: &str) -> Option<FieldType> {
 
         _ => {
             dbg!(&matches);
-            error!("Type '{}' unexpected in field type '{}'", &matches[1], typ_str);
+            error!("Type '{}' unexpected in field type '{}'", &matches[1], type_str);
             None
         }
     }
@@ -405,11 +405,11 @@ fn encode(in_file: &String, out_file: &String) -> Option<()> {
     for record in lines.records() {
         let mut rec = record.ok()?;
 
-        let typ_str = &rec[0];
+        let type_str = &rec[0];
         let description = &rec[1];
         let value_str = &rec[2];
 
-        let typ = parse_typ(typ_str)?;
+        let typ = parse_type(type_str)?;
 
         let field = to_field(typ, value_str, description.to_string());
         info!("{}", field);
@@ -467,7 +467,7 @@ fn decode(in_file: &String, out_file: &String, template_file: &String, repetitio
 
         let template: Template =
             Template {
-                typ: parse_typ(&rec[0])?,
+                typ: parse_type(&rec[0])?,
                 description: rec[1].to_string(),
             };
 
