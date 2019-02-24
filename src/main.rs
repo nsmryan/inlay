@@ -1,49 +1,3 @@
-///
-/// Inlay
-///
-/// This program provides a very simple translation from binary data to csv, and csv
-/// to binary data. It is intended for working with trivial binary formats, and especially
-/// for initial testing and development while there may not be tools specific to the format
-/// to use.
-///
-/// CSV -> Binary
-/// When building a binary file, a csv file in the following format must be provided:
-/// type,description,value
-/// uint8_be,field1,1
-/// uint16_be,field2,141
-/// uint32_be,field3,1245
-///
-///
-/// The header must have fields typ, description, and value, in that order. The types
-/// are given by the following regex:
-/// (uint8|uint16|uint32|uint64|int8|int16|int32|int64|float|double)_(be|le)
-///
-/// Any field can be big endian or little endian, allowing mixed endianness within
-/// a file.
-///
-/// Binary -> CSV
-/// When translating binary to CSV, a file of the following format must be provided:
-/// type,description
-/// uint64_be,a 64 bit field
-/// uint8_be,an 8 bit field
-///
-/// This file must have a header "type,description" and any number of entries with
-/// a type as defined above. The description is optional and will be copied into the
-/// output csv file.
-///
-/// The output csv file is in exactly the same format as the input csv file when 
-/// encoding from CSV -> Binary. This means that a binary structure can be decoded,
-/// modified and written back.
-/// To assist with this use case, if the "template" file given during decoding has
-/// a "values" column it will be ignored. This allows a csv file from decoding to be used as the
-/// template when decoding other instances of a binary structure.
-///
-///
-/// When decoding, a file many have many entries. The command line options allow repetitions
-/// of a certain number of repeated structures, or as many as necessary to read the whole file.
-/// Structopt seems to require the flag "-r=-1" rather then "-r -1" when specifying negative
-/// numbers.
-///
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate serde_derive;
 extern crate regex;
@@ -53,7 +7,7 @@ extern crate byteorder;
 #[macro_use]
 extern crate log;
 extern crate loggerv;
-extern crate bitstream_io;
+extern crate glob;
 
 
 use std::io::{Read, Write};
@@ -69,6 +23,8 @@ use log::{Level};
 
 use regex::Regex;
 
+use glob::glob;
+
 mod types;
 use types::*;
 
@@ -78,20 +34,20 @@ use types::*;
 enum Opt {
     #[structopt(name="encode")]
     Encode {
-        in_file: String,
+        in_files: Vec<String>,
 
-        #[structopt(short="o", long="output", default_value="data.bin")]
+        #[structopt(short="o", long="output", default_value="")]
         out_file: String,
 
-        #[structopt(short="l", long="log-level", default_value="Level::info")]
+        #[structopt(short="l", long="log-level", default_value="info")]
         log_level: Level,
      },
 
      #[structopt(name="decode")]
      Decode {
-        in_file: String,
+        in_files: Vec<String>,
 
-        #[structopt(short="o", long="output", default_value="data.csv")]
+        #[structopt(short="o", long="output", default_value="")]
         out_file: String,
 
         #[structopt(short="t", long="template")]
@@ -100,7 +56,7 @@ enum Opt {
         #[structopt(short="r", long="repeat", default_value="1")]
         repetitions: isize,
 
-        #[structopt(short="l", long="log-level", default_value="Level::info")]
+        #[structopt(short="l", long="log-level", default_value="info")]
         log_level: Level,
      },
 }
@@ -117,6 +73,7 @@ fn to_field(typ: FieldType, value_str: &str, description: String) -> Field {
 }
 
 fn to_value(typ: FieldType, value_str: &str) -> Value {
+  dbg!(value_str);
   match typ {
     FieldType::Int(num_bits, _) => {
         if num_bits <= 8 {
@@ -499,14 +456,40 @@ fn main() {
 
 
     match opt {
-        Opt::Encode { in_file, out_file, log_level} => {
+        Opt::Encode { in_files, out_file, log_level} => {
             loggerv::init_with_level(log_level).unwrap();
-            encode(&in_file, &out_file);
+
+            if in_files.len() > 1 && out_file.len() > 0 {
+                error!("Outfile not supported when run with multiple input files!");
+            } else if out_file.len() > 0 {
+                for in_file in in_files {
+                    encode(&in_file, &out_file);
+                }
+            } else {
+                for in_file in in_files {
+                    let mut out_file = in_file.clone();
+                    out_file.push_str(".bin");
+                    encode(&in_file, &out_file);
+                }
+            }
         },
 
-        Opt::Decode { in_file, out_file, template_file, repetitions, log_level } => {
+        Opt::Decode { in_files, out_file, template_file, repetitions, log_level } => {
             loggerv::init_with_level(log_level).unwrap();
-            decode(&in_file, &out_file, &template_file, repetitions);
+
+            if in_files.len() > 1 && out_file.len() > 0 {
+                error!("Outfile not supported when run with multiple input files!");
+            } else if out_file.len() > 0 {
+                for in_file in in_files {
+                    decode(&in_file, &out_file, &template_file, repetitions);
+                }
+            } else {
+                for in_file in in_files {
+                    let mut out_file = in_file.clone();
+                    out_file.push_str(".csv");
+                    decode(&in_file, &out_file, &template_file, repetitions);
+                }
+            }
         },
     }
 
