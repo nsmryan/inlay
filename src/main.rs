@@ -155,106 +155,78 @@ fn to_value(typ: FieldType, value_str: &str) -> Value {
   }
 }
 
-fn write_out<R>(reader: &mut R, field: &Field, endianness: &Endianness)
+fn write_out<R>(reader: &mut R, field: &Field, bit_buffer: &mut BitBuffer)
     where R: Read + WriteBytesExt {
 
-    match field.typ.endianness() {
-        Endianness::Big => {
-          match field.value {
-            Value::Uint8(val) => { reader.write(&[val]).ok(); },
-            Value::Int8(val) => { reader.write(&[val as u8]).ok(); },
-            Value::Uint16(val) => { reader.write_u16::<BigEndian>(val).ok(); },
-            Value::Int16(val) => { reader.write_i16::<BigEndian>(val).ok(); },
-            Value::Uint32(val) => { reader.write_u32::<BigEndian>(val).ok(); },
-            Value::Int32(val) => { reader.write_i32::<BigEndian>(val).ok(); },
-            Value::Uint64(val) => { reader.write_u64::<BigEndian>(val).ok(); },
-            Value::Int64(val) => { reader.write_i64::<BigEndian>(val).ok(); },
-            Value::Float(val) => { reader.write_f32::<BigEndian>(val).ok(); },
-            Value::Double(val) => { reader.write_f64::<BigEndian>(val).ok(); },
-          }
-        },
+    // the common case is that we are writing fields that fit into full bytes.
+    if bit_buffer.bits_avail == 0 && field.full_width() {
+        match field.typ.endianness() {
+            Endianness::Big => {
+              match field.value {
+                Value::Uint8(val) => { reader.write(&[val]).ok(); },
+                Value::Int8(val) => { reader.write(&[val as u8]).ok(); },
+                Value::Uint16(val) => { reader.write_u16::<BigEndian>(val).ok(); },
+                Value::Int16(val) => { reader.write_i16::<BigEndian>(val).ok(); },
+                Value::Uint32(val) => { reader.write_u32::<BigEndian>(val).ok(); },
+                Value::Int32(val) => { reader.write_i32::<BigEndian>(val).ok(); },
+                Value::Uint64(val) => { reader.write_u64::<BigEndian>(val).ok(); },
+                Value::Int64(val) => { reader.write_i64::<BigEndian>(val).ok(); },
+                Value::Float(val) => { reader.write_f32::<BigEndian>(val).ok(); },
+                Value::Double(val) => { reader.write_f64::<BigEndian>(val).ok(); },
+              }
+            },
 
-        Endianness::Little => {
-          match field.value {
-            Value::Uint8(val) => { reader.write(&[val]).ok(); },
-            Value::Int8(val) => { reader.write(&[val as u8]).ok(); },
-            Value::Uint16(val) => { reader.write_u16::<LittleEndian>(val).ok(); },
-            Value::Int16(val) => { reader.write_i16::<LittleEndian>(val).ok(); },
-            Value::Uint32(val) => { reader.write_u32::<LittleEndian>(val).ok(); },
-            Value::Int32(val) => { reader.write_i32::<LittleEndian>(val).ok(); },
-            Value::Uint64(val) => { reader.write_u64::<LittleEndian>(val).ok(); },
-            Value::Int64(val) => { reader.write_i64::<LittleEndian>(val).ok(); },
-            Value::Float(val) => { reader.write_f32::<LittleEndian>(val).ok(); },
-            Value::Double(val) => { reader.write_f64::<LittleEndian>(val).ok(); },
-          }
-        },
+            Endianness::Little => {
+              match field.value {
+                Value::Uint8(val) => { reader.write(&[val]).ok(); },
+                Value::Int8(val) => { reader.write(&[val as u8]).ok(); },
+                Value::Uint16(val) => { reader.write_u16::<LittleEndian>(val).ok(); },
+                Value::Int16(val) => { reader.write_i16::<LittleEndian>(val).ok(); },
+                Value::Uint32(val) => { reader.write_u32::<LittleEndian>(val).ok(); },
+                Value::Int32(val) => { reader.write_i32::<LittleEndian>(val).ok(); },
+                Value::Uint64(val) => { reader.write_u64::<LittleEndian>(val).ok(); },
+                Value::Int64(val) => { reader.write_i64::<LittleEndian>(val).ok(); },
+                Value::Float(val) => { reader.write_f32::<LittleEndian>(val).ok(); },
+                Value::Double(val) => { reader.write_f64::<LittleEndian>(val).ok(); },
+              }
+            },
+        }
+    // otherwise, do bit level writes
+    } else {
+        bit_buffer.push_value(field.value, field.typ.num_bits(), field.typ.endianness());
+
+        if bit_buffer.bits_avail % 8 == 0 {
+            for _ in 0..(bit_buffer.bits_avail / 8) {
+                reader.write(&[bit_buffer.pull_byte()]);
+            }
+        }
     }
 }
 
-fn read_field<R>(reader: &mut R, template: &Template) -> Option<Field>
+fn read_field<R>(reader: &mut R,
+                 bit_buffer: &mut BitBuffer,
+                 template: &Template) -> Option<Field>
     where R: ReadBytesExt {
+
+    let num_bits = template.typ.num_bits();
+
     match template.typ {
-        FieldType::Int(num_bits, endianness) => {
-            let value;
-            if endianness == Endianness::Little {
-                if num_bits <= 8 {
-                    value = Value::Uint8(reader.read_u8().ok()?);
-                } else if num_bits <= 16 {
-                    value = Value::Uint16(reader.read_u16::<LittleEndian>().ok()?);
-                } else if num_bits <= 32 {
-                    value = Value::Uint32(reader.read_u32::<LittleEndian>().ok()?);
-                } else if num_bits <= 64 {
-                    value = Value::Uint64(reader.read_u64::<LittleEndian>().unwrap());
-                } else {
-                    panic!("{} bits in a field are not supported!");
-                }
-            } else {
-                if num_bits <= 8 {
-                    value = Value::Uint8(reader.read_u8().ok()?);
-                } else if num_bits <= 16 {
-                    value = Value::Uint16(reader.read_u16::<BigEndian>().ok()?);
-                } else if num_bits <= 32 {
-                    value = Value::Uint32(reader.read_u32::<BigEndian>().ok()?);
-                } else if num_bits <= 64 {
-                    value = Value::Uint64(reader.read_u64::<BigEndian>().ok()?);
-                } else {
-                    panic!("{} bits in a field are not supported!");
+        FieldType::Int(_, _) | FieldType::Uint(_, _) => {
+            let value: Value;
+
+            while (bit_buffer.bits_avail as usize) < num_bits {
+                let byte = reader.read_u8().ok()?;
+
+                match template.typ.endianness() {
+                    Endianness::Little => bit_buffer.push_byte_le(num_bits as u8)?,
+                    Endianness::Big     => bit_buffer.push_byte_be(num_bits as u8)?,
                 }
             }
 
-            Some(Field {
-                value: value,
-                typ: template.typ,
-                description: template.description.clone(),
-            })
-        },
-
-        FieldType::Uint(num_bits, endianness) => {
-            let value;
-            if endianness == Endianness::Little {
-                if num_bits <= 8 {
-                    value = Value::Int8(reader.read_i8().ok()?);
-                } else if num_bits <= 16 {
-                    value = Value::Int16(reader.read_i16::<LittleEndian>().ok()?);
-                } else if num_bits <= 32 {
-                    value = Value::Int32(reader.read_i32::<LittleEndian>().ok()?);
-                } else if num_bits <= 64 {
-                    value = Value::Int64(reader.read_i64::<LittleEndian>().ok()?);
-                } else {
-                    panic!("{} bits in a field are not supported!");
-                }
-            } else {
-                if num_bits <= 8 {
-                    value = Value::Int8(reader.read_i8().ok()?);
-                } else if num_bits <= 16 {
-                    value = Value::Int16(reader.read_i16::<BigEndian>().ok()?);
-                } else if num_bits <= 32 {
-                    value = Value::Int32(reader.read_i32::<BigEndian>().ok()?);
-                } else if num_bits <= 64 {
-                    value = Value::Int64(reader.read_i64::<BigEndian>().ok()?);
-                } else {
-                    panic!("{} bits in a field are not supported!");
-                }
+            match template.typ {
+                FieldType::Int(_,  _) => { value = bit_buffer.pull_value_int(num_bits as u8); },
+                FieldType::Uint(_, _) => { value = bit_buffer.pull_value_uint(num_bits as u8); },
+                _ => panic!("This case should have been guarded by an above match!"),
             }
 
             Some(Field {
@@ -265,33 +237,44 @@ fn read_field<R>(reader: &mut R, template: &Template) -> Option<Field>
         },
 
         FieldType::Float(endianness) => {
-            let value;
-            if endianness == Endianness::Little {
-                value = Value::Float(reader.read_f32::<LittleEndian>().ok()?);
+            if bit_buffer.bits_avail != 0 {
+                error!("Tried to read a float from a bit offset!");
+                None
             } else {
-                value = Value::Float(reader.read_f32::<BigEndian>().ok()?);
-            }
+                let value;
 
-            Some(Field {
-                value: value,
-                typ: template.typ,
-                description: template.description.clone(),
-            })
+                if endianness == Endianness::Little {
+                    value = Value::Float(reader.read_f32::<LittleEndian>().ok()?);
+                } else {
+                    value = Value::Float(reader.read_f32::<BigEndian>().ok()?);
+                }
+
+                Some(Field {
+                    value: value,
+                    typ: template.typ,
+                    description: template.description.clone(),
+                })
+            }
         },
 
         FieldType::Double(endianness) => {
-            let value;
-            if endianness == Endianness::Little {
-                value = Value::Double(reader.read_f64::<LittleEndian>().ok()?);
+            if bit_buffer.bits_avail != 0 {
+                error!("Tried to read a double from a bit offset!");
+                None
             } else {
-                value = Value::Double(reader.read_f64::<BigEndian>().ok()?);
-            }
+                let value;
+                if endianness == Endianness::Little {
+                    value = Value::Double(reader.read_f64::<LittleEndian>().ok()?);
+                } else {
+                    value = Value::Double(reader.read_f64::<BigEndian>().ok()?);
+                }
 
-            Some(Field {
-                value: value,
-                typ: template.typ,
-                description: template.description.clone(),
-            })
+                Some(Field {
+                    value: value,
+                    typ: template.typ,
+                    description: template.description.clone(),
+                })
+            }
         },
     }
 }
@@ -397,6 +380,8 @@ fn encode(in_file: &String, out_file: &String) -> Option<()> {
 
     let mut endianness = Endianness::Big;
 
+    let mut bit_buffer: BitBuffer = Default::default();
+
     for record in lines.records() {
         let mut rec = record.ok()?;
 
@@ -409,7 +394,7 @@ fn encode(in_file: &String, out_file: &String) -> Option<()> {
         let field = to_field(typ, value_str, description.to_string());
         info!("{}", field);
 
-        write_out(&mut output, &field, &field.typ.endianness());
+        write_out(&mut output, &field, &mut bit_buffer);
     }
 
     info!("Finished writing to {}", &out_file);
@@ -419,6 +404,7 @@ fn encode(in_file: &String, out_file: &String) -> Option<()> {
 
 fn decode(in_file: &String, out_file: &String, template_file: &String, repetitions: isize) -> Option<()> {
     let mut input_file;
+    let mut decoder_state = Default::default();
 
     match File::open(&in_file) {
         Ok(file_handle) => input_file = file_handle,
@@ -455,7 +441,6 @@ fn decode(in_file: &String, out_file: &String, template_file: &String, repetitio
     }
 
     output.write_all(&"type,description,value\n".to_string().as_bytes());
-    // NOTE parse manually to provide better error messages
     let mut templates: Vec<Template> = vec!();
     for record in lines.records() {
         let mut rec = record.ok()?;
@@ -473,7 +458,7 @@ fn decode(in_file: &String, out_file: &String, template_file: &String, repetitio
     // negative numbers will repeat to end of file
     while index != 0 {
         for template in templates.iter() {
-            let field = read_field(&mut input, &template)?;
+            let field = read_field(&mut input, &mut decoder_state, &template)?;
             info!("{}", field);
 
             write_field(&mut output, &field, &template.description);

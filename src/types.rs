@@ -15,10 +15,10 @@ pub type NumBytes = usize;
 #[derive(Eq, PartialEq, Debug, Copy, Clone, Deserialize)]
 pub enum FieldType {
     /// Signed integers
-    Int(NumBits, Endianness, Option<NumBytes>),
+    Int(NumBits, Endianness),
 
     /// Unsigned integers
-    Uint(NumBits, Endianness, Option<NumBytes>),
+    Uint(NumBits, Endianness),
 
     /// Single Precision Float
     Float(Endianness),
@@ -30,28 +30,20 @@ pub enum FieldType {
 impl fmt::Display for FieldType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-          FieldType::Int(num_bits, endianness, num_bytes) => {
-              write!(f, "int{}_{}", num_bits, endianness.to_string());
-              match num_bytes {
-                  None => (),
-                  Some(bytes) => write!(f, ":{}", bytes),
-              }
+          FieldType::Int(num_bits, endianness) => {
+              write!(f, "int{}_{}", num_bits, endianness.to_string())
           },
 
-          FieldType::Uint(num_bits, endianness, num_bytes) => {
-              write!(f, "uint{}_{}", num_bits, endianness.to_string());
-              match num_bytes {
-                  None => (),
-                  Some(bytes) => write!(f, ":{}", bytes),
-              }
+          FieldType::Uint(num_bits, endianness) => {
+              write!(f, "uint{}_{}", num_bits, endianness.to_string())
           },
 
           FieldType::Float(endianness) => {
-              write!(f, "float_{}", endianness.to_string());
+              write!(f, "float_{}", endianness.to_string())
           },
 
           FieldType::Double(endianness) => {
-              write!(f, "double_{}", endianness.to_string());
+              write!(f, "double_{}", endianness.to_string())
           },
         }
     }
@@ -61,13 +53,25 @@ impl FieldType {
     /// Get the endianness of a FieldType
     pub fn endianness(&self) -> Endianness {
         match self {
-          FieldType::Int(_, endianness, _) => *endianness,
+          FieldType::Int(_, endianness) => *endianness,
 
-          FieldType::Uint(_, endianness, _) => *endianness,
+          FieldType::Uint(_, endianness) => *endianness,
 
           FieldType::Float(endianness) => *endianness,
 
           FieldType::Double(endianness) => *endianness,
+        }
+    }
+
+    pub fn num_bits(&self) -> NumBits {
+        match self {
+          FieldType::Int(num_bits, _) => *num_bits,
+
+          FieldType::Uint(num_bits, _) => *num_bits,
+
+          FieldType::Float(_) => 32,
+
+          FieldType::Double(_) => 64,
         }
     }
 }
@@ -103,6 +107,10 @@ impl Value {
       Value::Float(_)  => 4,
       Value::Double(_) => 8,
     }
+  }
+
+  pub fn num_bits(&self) -> usize {
+      self.num_bytes() * 8
   }
 
   pub fn to_string(&self) -> String {
@@ -151,6 +159,18 @@ impl Field {
     pub fn to_record(&self) -> String {
         format!("{},{},{}", self.typ.to_string(), self.description, self.value.to_string())
     }
+
+    pub fn full_width(&self) -> bool {
+        match self.typ {
+          FieldType::Int(num_bits, _) => num_bits == self.value.num_bits(),
+
+          FieldType::Uint(num_bits, _) => num_bits == self.value.num_bits(),
+
+          FieldType::Float(_) => true,
+
+          FieldType::Double(_) => true,
+        }
+    }
 }
 
 impl fmt::Display for Field {
@@ -168,3 +188,180 @@ pub struct Template {
   pub description: String,
 }
 
+
+#[derive(Eq, PartialEq, Debug, Clone)]
+pub struct BitBuffer {
+    pub bits: u64,
+    pub bits_avail: u8,
+}
+
+impl Default for BitBuffer {
+    fn default() -> BitBuffer {
+        BitBuffer {
+            bits: 0,
+            bits_avail: 0,
+        }
+    }
+}
+
+impl BitBuffer {
+    pub fn push_byte_be(&mut self, byte: u8) -> Option<()> {
+        if self.bits_avail + 8 < 64 {
+            self.bits = ((self.bits as u64) << 8) | byte as u64;
+            self.bits_avail += 8;
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    pub fn push_byte_le(&mut self, byte: u8) -> Option<()> {
+        if self.bits_avail + 8 < 64 {
+            self.bits |= ((byte as u64) << self.bits_avail as u64);
+            self.bits_avail += 8;
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    pub fn push_value(&mut self, value: Value, num_bits: NumBits, endianness: Endianness) {
+        match self {
+          Value::Uint8(val)  => {
+              self.bits = (self.bits << num_bits) | (val as u64);
+              self.bits_avail += 8;
+          },
+
+          Value::Int8(val)   => {
+              self.bits = (self.bits << num_bits) | (val as u64);
+              self.bits_avail += 8;
+          },
+
+          Value::Uint16(val) => {
+              match endianness {
+                  Endianness::Little => {
+                  },
+
+                  Endianness::Big => {
+                  },
+              }
+          },
+
+          Value::Int16(val)  => {
+              match endianness {
+                  Endianness::Little => {
+                  },
+
+                  Endianness::Big => {
+                  },
+              }
+          },
+
+          Value::Uint32(val) => {
+              match endianness {
+                  Endianness::Little => {
+                  },
+
+                  Endianness::Big => {
+                  },
+              }
+          },
+
+          Value::Int32(val)  => {
+              match endianness {
+                  Endianness::Little => {
+                  },
+
+                  Endianness::Big => {
+                  },
+              }
+          },
+
+          Value::Uint64(val) => {
+              match endianness {
+                  Endianness::Little => {
+                  },
+
+                  Endianness::Big => {
+                  },
+              }
+          },
+
+          Value::Int64(val)  => {
+              match endianness {
+                  Endianness::Little => {
+                  },
+
+                  Endianness::Big => {
+                  },
+              }
+          },
+
+          Value::Float(val)  => {
+              match endianness {
+                  Endianness::Little => {
+                  },
+
+                  Endianness::Big => {
+                  },
+              }
+          },
+
+          Value::Double(val) => {
+              match endianness {
+                  Endianness::Little => {
+                  },
+
+                  Endianness::Big => {
+                  },
+              }
+          },
+        }
+    }
+
+    // NOTE this could provide an Option<Value> to indicate errors
+    pub fn pull_value_int(&mut self, num_bits: u8) -> Value {
+        let value = self.bits & ((num_bits as u64).pow(2) - 1);
+        self.bits >>= num_bits;
+
+        if num_bits <= 8 {
+            Value::Int8(value as i8)
+        } else if num_bits <= 16 {
+            Value::Int16(value as i16)
+        } else if num_bits <= 32 {
+            Value::Int32(value as i32)
+        } else if num_bits <= 64 {
+            Value::Int64(value as i64)
+        } else {
+            panic!("{} bits in a field are not supported!");
+        }
+    }
+
+    // NOTE this could provide an Option<Value> to indicate errors
+    pub fn pull_value_uint(&mut self, num_bits: u8) -> Value {
+        let value = self.bits & ((num_bits as u64).pow(2) - 1);
+        self.bits >>= num_bits;
+
+        if num_bits <= 8 {
+            Value::Uint8(value as u8)
+        } else if num_bits <= 16 {
+            Value::Uint16(value as u16)
+        } else if num_bits <= 32 {
+            Value::Uint32(value as u32)
+        } else if num_bits <= 64 {
+            Value::Uint64(value as u64)
+        } else {
+            panic!("{} bits in a field are not supported!");
+        }
+    }
+
+    pub fn pull_byte(&mut self) -> u8 {
+        if self.bits_avail < 8 {
+            panic!("No byte availble to pull!");
+        } else {
+            let byte: u8 = self.bits as u8;
+            self.bits = self.bits << 8;
+            byte
+        }
+    }
+}
