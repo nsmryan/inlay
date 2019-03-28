@@ -175,18 +175,20 @@ fn read_field<R>(reader: &mut R,
         FieldType::Int(_, _) | FieldType::Uint(_, _) => {
             let value: Value;
 
+            // while we need more bits, push bytes from the reader into the decoder
             while (bit_buffer.bits_avail as usize) < num_bits {
                 let byte = reader.read_u8().ok()?;
+                dbg!(byte);
 
                 match template.typ.endianness() {
-                    Endianness::Little => bit_buffer.push_byte_le(num_bits as u8)?,
-                    Endianness::Big     => bit_buffer.push_byte_be(num_bits as u8)?,
+                    Endianness::Little => bit_buffer.push_byte_le(byte)?,
+                    Endianness::Big    => bit_buffer.push_byte_be(byte)?,
                 }
             }
 
             match template.typ {
-                FieldType::Int(_,  _) => { value = bit_buffer.pull_value_int(num_bits as u8); },
-                FieldType::Uint(_, _) => { value = bit_buffer.pull_value_uint(num_bits as u8); },
+                FieldType::Int(_,  _) => { value = bit_buffer.pull_value_int(num_bits as u8)?; },
+                FieldType::Uint(_, _) => { value = bit_buffer.pull_value_uint(num_bits as u8)?; },
                 _ => panic!("This case should have been guarded by an above match!"),
             }
 
@@ -367,8 +369,6 @@ fn encode(in_file: &String, out_file: &String) -> Option<()> {
 }
 
 fn decode(in_file: &String, out_file: &String, template_file: &String, repetitions: isize) -> Option<()> {
-    let mut decoder_state = Default::default();
-
     let mut input_file =
         File::open(&in_file).expect(&format!("Could not open input file '{}'!", &in_file));
     let mut input = BufReader::new(input_file);
@@ -380,11 +380,11 @@ fn decode(in_file: &String, out_file: &String, template_file: &String, repetitio
 
     let header_line = lines.headers().ok()?;
 
-    let mut output =
+    let mut output_file =
         File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
 
 
-    output.write_all(&"type,description,value\n".to_string().as_bytes());
+    output_file.write_all(&"type,description,value\n".to_string().as_bytes());
     let mut templates: Vec<Template> = vec!();
     for record in lines.records() {
         let mut rec = record.ok()?;
@@ -400,14 +400,15 @@ fn decode(in_file: &String, out_file: &String, template_file: &String, repetitio
         templates.push(template);
     }
 
+    let mut decoder_state = Default::default();
     for index in 0..repetitions {
         for template in templates.iter() {
             let field = read_field(&mut input, &mut decoder_state, &template)?;
             info!("{}", field);
 
-            write_field(&mut output, &field, &template.description);
+            write_field(&mut output_file, &field, &template.description);
 
-            output.write_all(&b"\n"[..]).unwrap();
+            output_file.write_all(&b"\n"[..]).unwrap();
         }
     }
 

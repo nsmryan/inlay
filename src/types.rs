@@ -204,8 +204,8 @@ pub struct BitBuffer {
 
 impl BitBuffer {
     pub fn push_byte_be(&mut self, byte: u8) -> Option<()> {
-        if self.bits_avail + 8 < 64 {
-            self.bits = ((self.bits as u64) << 8) | byte as u64;
+        if self.bits_avail + 8 <= 64 {
+            self.bits = (self.bits << 8) | (byte as u64);
             self.bits_avail += 8;
             Some(())
         } else {
@@ -214,7 +214,7 @@ impl BitBuffer {
     }
 
     pub fn push_byte_le(&mut self, byte: u8) -> Option<()> {
-        if self.bits_avail + 8 < 64 {
+        if self.bits_avail + 8 <= 64 {
             self.bits |= ((byte as u64) << self.bits_avail as u64);
             self.bits_avail += 8;
             Some(())
@@ -285,39 +285,39 @@ impl BitBuffer {
         self.bits_avail += num_bits as u8;
     }
 
-    // NOTE this could provide an Option<Value> to indicate errors
-    pub fn pull_value_int(&mut self, num_bits: u8) -> Value {
-        let value = self.bits & ((num_bits as u64).pow(2) - 1);
-        self.bits >>= num_bits;
+    pub fn pull_value_int(&mut self, num_bits: u8) -> Option<Value> {
+        let mask = (2u64.pow(num_bits as u32) - 1);
+        let value = (self.bits >> (self.bits_avail - num_bits)) & mask;
+        self.bits_avail -= num_bits;
 
         if num_bits <= 8 {
-            Value::Int8(value as i8)
+            Some(Value::Int8(value as i8))
         } else if num_bits <= 16 {
-            Value::Int16(value as i16)
+            Some(Value::Int16(value as i16))
         } else if num_bits <= 32 {
-            Value::Int32(value as i32)
+            Some(Value::Int32(value as i32))
         } else if num_bits <= 64 {
-            Value::Int64(value as i64)
+            Some(Value::Int64(value as i64))
         } else {
-            panic!("{} bits in a field are not supported!");
+            None
         }
     }
 
-    // NOTE this could provide an Option<Value> to indicate errors
-    pub fn pull_value_uint(&mut self, num_bits: u8) -> Value {
-        let value = self.bits & ((num_bits as u64).pow(2) - 1);
-        self.bits >>= num_bits;
+    pub fn pull_value_uint(&mut self, num_bits: u8) -> Option<Value> {
+        let mask = (2u64.pow(num_bits as u32) - 1);
+        let value = (self.bits >> (self.bits_avail - num_bits)) & mask;
+        self.bits_avail -= num_bits;
 
         if num_bits <= 8 {
-            Value::Uint8(value as u8)
+            Some(Value::Uint8(value as u8))
         } else if num_bits <= 16 {
-            Value::Uint16(value as u16)
+            Some(Value::Uint16(value as u16))
         } else if num_bits <= 32 {
-            Value::Uint32(value as u32)
+            Some(Value::Uint32(value as u32))
         } else if num_bits <= 64 {
-            Value::Uint64(value as u64)
+            Some(Value::Uint64(value as u64))
         } else {
-            panic!("{} bits in a field are not supported!");
+            None
         }
     }
 
