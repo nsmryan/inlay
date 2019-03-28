@@ -76,20 +76,6 @@ fn to_value(typ: FieldType, value_str: &str) -> Value {
   match typ {
     FieldType::Int(num_bits, _) => {
         if num_bits <= 8 {
-            Value::Uint8(value_str.parse().ok().unwrap())
-        } else if num_bits <= 16 {
-            Value::Uint16(value_str.parse().ok().unwrap())
-        } else if num_bits <= 32 {
-            Value::Uint32(value_str.parse().ok().unwrap())
-        } else if num_bits <= 64 {
-            Value::Uint64(value_str.parse().ok().unwrap())
-        } else {
-            panic!("{} bit fields are not allowed!", num_bits);
-        }
-    },
-
-    FieldType::Uint(num_bits, _) => {
-        if num_bits <= 8 {
             Value::Int8(value_str.parse().ok().unwrap())
         } else if num_bits <= 16 {
             Value::Int16(value_str.parse().ok().unwrap())
@@ -97,6 +83,20 @@ fn to_value(typ: FieldType, value_str: &str) -> Value {
             Value::Int32(value_str.parse().ok().unwrap())
         } else if num_bits <= 64 {
             Value::Int64(value_str.parse().ok().unwrap())
+        } else {
+            panic!("{} bit fields are not allowed!", num_bits);
+        }
+    },
+
+    FieldType::Uint(num_bits, _) => {
+        if num_bits <= 8 {
+            Value::Uint8(value_str.parse().ok().unwrap())
+        } else if num_bits <= 16 {
+            Value::Uint16(value_str.parse().ok().unwrap())
+        } else if num_bits <= 32 {
+            Value::Uint32(value_str.parse().ok().unwrap())
+        } else if num_bits <= 64 {
+            Value::Uint64(value_str.parse().ok().unwrap())
         } else {
             panic!("{} bit fields are not allowed!", num_bits);
         }
@@ -150,9 +150,13 @@ fn write_out<R>(reader: &mut R, field: &Field, bit_buffer: &mut BitBuffer)
         }
     // otherwise, do bit level writes
     } else {
+        //println!("before bit_buffer.bits = {:b}, {} bits", bit_buffer.bits, field.typ.num_bits());
         bit_buffer.push_value(field.value, field.typ.num_bits(), field.typ.endianness());
+        //println!("after  bit_buffer.bits = {:b}", bit_buffer.bits);
 
+        //println!("bits avail = {}", bit_buffer.bits_avail);
         if bit_buffer.bits_avail % 8 == 0 {
+            // println!("Writing out {} bytes", bit_buffer.bits_avail / 8);
             for _ in 0..(bit_buffer.bits_avail / 8) {
                 reader.write(&[bit_buffer.pull_byte()]);
             }
@@ -240,6 +244,9 @@ fn write_field<W: Write>(writer: &mut W, field: &Field, description: &String) {
     writer.write_all(&field.to_record().as_bytes());
 }
 
+// NOTE It would be better to use a syntax like
+// uint8_be:3 so you can specify both a type and a bitwidth, with the bitwidth
+// optional
 fn parse_type(type_str: &str) -> Option<FieldType> {
     let type_str = type_str.to_lowercase();
 
@@ -360,70 +367,48 @@ fn encode(in_file: &String, out_file: &String) -> Option<()> {
 }
 
 fn decode(in_file: &String, out_file: &String, template_file: &String, repetitions: isize) -> Option<()> {
-    let mut input_file;
     let mut decoder_state = Default::default();
 
-    match File::open(&in_file) {
-        Ok(file_handle) => input_file = file_handle,
-        Err(_) => {
-            error!("Could not open input file '{}'!", &in_file);
-            return Some(());
-        },
-    }
+    let mut input_file =
+        File::open(&in_file).expect(&format!("Could not open input file '{}'!", &in_file));
     let mut input = BufReader::new(input_file);
 
-    let template;
-    match File::open(&template_file) {
-        Ok(file_handle) => template = file_handle,
-        Err(_) => {
-            error!("Could not open template file '{}'!", &template_file);
-            return Some(());
-        },
-    }
-
-    info!("Opened {}", &template_file);
-
+    let template: File =
+        File::open(&template_file).expect(&format!("Could not open template file '{}'!", &template_file));
     let mut lines = csv::Reader::from_reader(&template);
+    info!("Opened {}", &template_file);
 
     let header_line = lines.headers().ok()?;
 
-    // NOTE ensure good error messages here
-    let mut output;
-    match File::create(&out_file) {
-        Ok(file_handle) => output = file_handle,
-        Err(_) => {
-            error!("Could not open output file '{}'!", &out_file);
-            return Some(());
-        },
-    }
+    let mut output =
+        File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
+
 
     output.write_all(&"type,description,value\n".to_string().as_bytes());
     let mut templates: Vec<Template> = vec!();
     for record in lines.records() {
         let mut rec = record.ok()?;
+        let typ = parse_type(&rec[0])?;
+        let desc = rec[1].to_string();
 
         let template: Template =
             Template {
-                typ: parse_type(&rec[0])?,
-                description: rec[1].to_string(),
+                typ: typ,
+                description: desc,
             };
 
         templates.push(template);
     }
 
-    let mut index = repetitions;
-    // negative numbers will repeat to end of file
-    while index != 0 {
+    for index in 0..repetitions {
         for template in templates.iter() {
             let field = read_field(&mut input, &mut decoder_state, &template)?;
             info!("{}", field);
 
             write_field(&mut output, &field, &template.description);
 
-            output.write_all(&b"\n"[..]);
+            output.write_all(&b"\n"[..]).unwrap();
         }
-
-        index -= 1;
     }
 
     info!("Finished writing to {}", &out_file);

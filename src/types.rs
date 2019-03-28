@@ -136,6 +136,12 @@ pub enum Endianness {
     Big
 }
 
+impl Default for Endianness {
+    fn default() -> Self {
+        Endianness::Little
+    }
+}
+
 impl Endianness {
     fn to_string(&self) -> String {
         match self {
@@ -189,19 +195,11 @@ pub struct Template {
 }
 
 
-#[derive(Eq, PartialEq, Debug, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone, Default)]
 pub struct BitBuffer {
     pub bits: u64,
     pub bits_avail: u8,
-}
-
-impl Default for BitBuffer {
-    fn default() -> BitBuffer {
-        BitBuffer {
-            bits: 0,
-            bits_avail: 0,
-        }
-    }
+    pub endianness: Endianness,
 }
 
 impl BitBuffer {
@@ -226,83 +224,47 @@ impl BitBuffer {
     }
 
     pub fn push_value(&mut self, value: Value, num_bits: NumBits, endianness: Endianness) {
-        match self {
+        match value {
           Value::Uint8(val)  => {
               self.bits = (self.bits << num_bits) | (val as u64);
-              self.bits_avail += 8;
           },
 
           Value::Int8(val)   => {
               self.bits = (self.bits << num_bits) | (val as u64);
-              self.bits_avail += 8;
           },
 
           Value::Uint16(val) => {
-              match endianness {
-                  Endianness::Little => {
-                  },
-
-                  Endianness::Big => {
-                  },
-              }
+              self.bits = (self.bits << num_bits) | (val as u64);
           },
 
           Value::Int16(val)  => {
-              match endianness {
-                  Endianness::Little => {
-                  },
-
-                  Endianness::Big => {
-                  },
-              }
+              self.bits = (self.bits << num_bits) | (val as u64);
           },
 
           Value::Uint32(val) => {
-              match endianness {
-                  Endianness::Little => {
-                  },
-
-                  Endianness::Big => {
-                  },
-              }
+              self.bits = (self.bits << num_bits) | (val as u64);
           },
 
           Value::Int32(val)  => {
-              match endianness {
-                  Endianness::Little => {
-                  },
-
-                  Endianness::Big => {
-                  },
-              }
+              self.bits = (self.bits << num_bits) | (val as u64);
           },
 
           Value::Uint64(val) => {
-              match endianness {
-                  Endianness::Little => {
-                  },
-
-                  Endianness::Big => {
-                  },
-              }
+              self.bits = (self.bits << num_bits) | (val as u64);
           },
 
           Value::Int64(val)  => {
-              match endianness {
-                  Endianness::Little => {
-                  },
-
-                  Endianness::Big => {
-                  },
-              }
+              self.bits = (self.bits << num_bits) | (val as u64);
           },
 
           Value::Float(val)  => {
               match endianness {
                   Endianness::Little => {
+                      unimplemented!();
                   },
 
                   Endianness::Big => {
+                      unimplemented!();
                   },
               }
           },
@@ -310,13 +272,17 @@ impl BitBuffer {
           Value::Double(val) => {
               match endianness {
                   Endianness::Little => {
+                      unimplemented!();
                   },
 
                   Endianness::Big => {
+                      unimplemented!();
                   },
               }
           },
         }
+
+        self.bits_avail += num_bits as u8;
     }
 
     // NOTE this could provide an Option<Value> to indicate errors
@@ -356,12 +322,29 @@ impl BitBuffer {
     }
 
     pub fn pull_byte(&mut self) -> u8 {
+        let result_byte;
+
         if self.bits_avail < 8 {
-            panic!("No byte availble to pull!");
+            panic!("No byte available to pull!");
         } else {
-            let byte: u8 = self.bits as u8;
-            self.bits = self.bits << 8;
-            byte
+            match self.endianness {
+                Endianness::Little => {
+                    let byte: u8 = self.bits as u8;
+                    self.bits = self.bits >> 8;
+                    result_byte = byte;
+                },
+
+                Endianness::Big => {
+                    let byte: u8 = (self.bits >> (self.bits_avail - 8)) as u8;
+                    // we do not need to modify the bits field here. the bits at the top are
+                    // left as they are, but made unavailble by reducing bits_avail.
+                    result_byte = byte;
+                },
+            }
+
+            self.bits_avail -= 8;
         }
+
+        return result_byte;
     }
 }
