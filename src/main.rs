@@ -72,7 +72,6 @@ fn to_field(typ: FieldType, value_str: &str, description: String) -> Field {
 }
 
 fn to_value(typ: FieldType, value_str: &str) -> Value {
-  dbg!(value_str);
   match typ {
     FieldType::Int(num_bits, _) => {
         if num_bits <= 8 {
@@ -178,7 +177,6 @@ fn read_field<R>(reader: &mut R,
             // while we need more bits, push bytes from the reader into the decoder
             while (bit_buffer.bits_avail as usize) < num_bits {
                 let byte = reader.read_u8().ok()?;
-                dbg!(byte);
 
                 match template.typ.endianness() {
                     Endianness::Little => bit_buffer.push_byte_le(byte)?,
@@ -242,8 +240,9 @@ fn read_field<R>(reader: &mut R,
     }
 }
 
+// TODO why is description not used? is this correct or not?
 fn write_field<W: Write>(writer: &mut W, field: &Field, description: &String) {
-    writer.write_all(&field.to_record().as_bytes());
+    writer.write_all(&field.to_record().as_bytes()).unwrap();
 }
 
 // NOTE It would be better to use a syntax like
@@ -318,7 +317,6 @@ fn parse_type(type_str: &str) -> Option<FieldType> {
         },
 
         _ => {
-            dbg!(&matches);
             error!("Type '{}' unexpected in field type '{}'", &matches[1], type_str);
             None
         }
@@ -344,12 +342,10 @@ fn encode(in_file: &String, out_file: &String) -> Option<()> {
 
     let mut output = File::create(&out_file).ok()?;
 
-    let mut endianness = Endianness::Big;
-
     let mut bit_buffer: BitBuffer = Default::default();
 
     for record in lines.records() {
-        let mut rec = record.ok()?;
+        let rec = record.ok()?;
 
         let type_str = &rec[0];
         let description = &rec[1];
@@ -369,7 +365,7 @@ fn encode(in_file: &String, out_file: &String) -> Option<()> {
 }
 
 fn decode(in_file: &String, out_file: &String, template_file: &String, repetitions: isize) -> Option<()> {
-    let mut input_file =
+    let input_file =
         File::open(&in_file).expect(&format!("Could not open input file '{}'!", &in_file));
     let mut input = BufReader::new(input_file);
 
@@ -378,16 +374,14 @@ fn decode(in_file: &String, out_file: &String, template_file: &String, repetitio
     let mut lines = csv::Reader::from_reader(&template);
     info!("Opened {}", &template_file);
 
-    let header_line = lines.headers().ok()?;
-
     let mut output_file =
         File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
 
 
-    output_file.write_all(&"type,description,value\n".to_string().as_bytes());
+    output_file.write_all(&"type,description,value\n".to_string().as_bytes()).unwrap();
     let mut templates: Vec<Template> = vec!();
     for record in lines.records() {
-        let mut rec = record.ok()?;
+        let rec = record.ok()?;
         let typ = parse_type(&rec[0])?;
         let desc = rec[1].to_string();
 
@@ -401,7 +395,7 @@ fn decode(in_file: &String, out_file: &String, template_file: &String, repetitio
     }
 
     let mut decoder_state = Default::default();
-    for index in 0..repetitions {
+    for _ in 0..repetitions {
         for template in templates.iter() {
             let field = read_field(&mut input, &mut decoder_state, &template)?;
             info!("{}", field);

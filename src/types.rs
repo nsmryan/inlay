@@ -224,59 +224,46 @@ impl BitBuffer {
     }
 
     pub fn push_value(&mut self, value: Value, num_bits: NumBits, endianness: Endianness) {
+        // make room for the new value
+        self.bits <<= num_bits;
+
         match value {
-          Value::Uint8(val)  => {
-              self.bits = (self.bits << num_bits) | (val as u64);
-          },
+          Value::Uint8(val)  => self.bits |= val as u64,
 
-          Value::Int8(val)   => {
-              self.bits = (self.bits << num_bits) | (val as u64);
-          },
+          Value::Int8(val)   => self.bits |= val as u64,
 
-          Value::Uint16(val) => {
-              self.bits = (self.bits << num_bits) | (val as u64);
-          },
+          Value::Uint16(val) => self.bits |= val as u64,
 
-          Value::Int16(val)  => {
-              self.bits = (self.bits << num_bits) | (val as u64);
-          },
+          Value::Int16(val)  => self.bits |= val as u64,
 
-          Value::Uint32(val) => {
-              self.bits = (self.bits << num_bits) | (val as u64);
-          },
+          Value::Uint32(val) => self.bits |= val as u64,
 
-          Value::Int32(val)  => {
-              self.bits = (self.bits << num_bits) | (val as u64);
-          },
+          Value::Int32(val)  => self.bits |= val as u64,
 
-          Value::Uint64(val) => {
-              self.bits = (self.bits << num_bits) | (val as u64);
-          },
+          Value::Uint64(val) => self.bits |= val as u64,
 
-          Value::Int64(val)  => {
-              self.bits = (self.bits << num_bits) | (val as u64);
-          },
+          Value::Int64(val)  => self.bits |= val as u64,
 
-          Value::Float(val)  => {
+          Value::Float(_)  => {
               match endianness {
                   Endianness::Little => {
-                      unimplemented!();
+                      error!("Floating point numbers within bit fields not yet implemented!");
                   },
 
                   Endianness::Big => {
-                      unimplemented!();
+                      error!("Floating point numbers within bit fields not yet implemented!");
                   },
               }
           },
 
-          Value::Double(val) => {
+          Value::Double(_) => {
               match endianness {
                   Endianness::Little => {
-                      unimplemented!();
+                      error!("Floating point numbers within bit fields not yet implemented!");
                   },
 
                   Endianness::Big => {
-                      unimplemented!();
+                      error!("Floating point numbers within bit fields not yet implemented!");
                   },
               }
           },
