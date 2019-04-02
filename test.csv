@@ -1,0 +1,5 @@
+typ,description,value
+uint3_be,test1,1
+uint1_be,test2,1
+uint4_be,test3,1
+uint16_be,test4,65535

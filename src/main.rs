@@ -4,8 +4,7 @@ extern crate regex;
 extern crate csv;
 extern crate byteorder;
 #[macro_use] extern crate structopt;
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 extern crate loggerv;
 extern crate glob;
 
@@ -14,19 +13,19 @@ use std::io::{Read, Write};
 use std::io::BufReader;
 use std::fs::File;
 
-use byteorder::{LittleEndian, BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 
 use structopt::StructOpt;
 
-use loggerv::*;
 use log::{Level};
 
 use regex::Regex;
 
-use glob::glob;
-
 mod types;
 use types::*;
+
+mod bit_buffer;
+use bit_buffer::*;
 
 
 #[derive(Debug, StructOpt)]
@@ -73,7 +72,7 @@ fn to_field(typ: FieldType, value_str: &str, description: String) -> Field {
 
 fn to_value(typ: FieldType, value_str: &str) -> Value {
   match typ {
-    FieldType::Int(num_bits, _) => {
+    FieldType::Int(num_bits, _, _) => {
         if num_bits <= 8 {
             Value::Int8(value_str.parse().ok().unwrap())
         } else if num_bits <= 16 {
@@ -87,7 +86,7 @@ fn to_value(typ: FieldType, value_str: &str) -> Value {
         }
     },
 
-    FieldType::Uint(num_bits, _) => {
+    FieldType::Uint(num_bits, _, _) => {
         if num_bits <= 8 {
             Value::Uint8(value_str.parse().ok().unwrap())
         } else if num_bits <= 16 {
@@ -114,52 +113,10 @@ fn to_value(typ: FieldType, value_str: &str) -> Value {
 fn write_out<R>(reader: &mut R, field: &Field, bit_buffer: &mut BitBuffer)
     where R: Read + WriteBytesExt {
 
-    // the common case is that we are writing fields that fit into full bytes.
-    if bit_buffer.bits_avail == 0 && field.full_width() {
-        match field.typ.endianness() {
-            Endianness::Big => {
-              match field.value {
-                Value::Uint8(val) => { reader.write(&[val]).ok(); },
-                Value::Int8(val) => { reader.write(&[val as u8]).ok(); },
-                Value::Uint16(val) => { reader.write_u16::<BigEndian>(val).ok(); },
-                Value::Int16(val) => { reader.write_i16::<BigEndian>(val).ok(); },
-                Value::Uint32(val) => { reader.write_u32::<BigEndian>(val).ok(); },
-                Value::Int32(val) => { reader.write_i32::<BigEndian>(val).ok(); },
-                Value::Uint64(val) => { reader.write_u64::<BigEndian>(val).ok(); },
-                Value::Int64(val) => { reader.write_i64::<BigEndian>(val).ok(); },
-                Value::Float(val) => { reader.write_f32::<BigEndian>(val).ok(); },
-                Value::Double(val) => { reader.write_f64::<BigEndian>(val).ok(); },
-              }
-            },
+    bit_buffer.push_value(field.value, field.typ.num_bits(), field.typ.endianness());
 
-            Endianness::Little => {
-              match field.value {
-                Value::Uint8(val) => { reader.write(&[val]).ok(); },
-                Value::Int8(val) => { reader.write(&[val as u8]).ok(); },
-                Value::Uint16(val) => { reader.write_u16::<LittleEndian>(val).ok(); },
-                Value::Int16(val) => { reader.write_i16::<LittleEndian>(val).ok(); },
-                Value::Uint32(val) => { reader.write_u32::<LittleEndian>(val).ok(); },
-                Value::Int32(val) => { reader.write_i32::<LittleEndian>(val).ok(); },
-                Value::Uint64(val) => { reader.write_u64::<LittleEndian>(val).ok(); },
-                Value::Int64(val) => { reader.write_i64::<LittleEndian>(val).ok(); },
-                Value::Float(val) => { reader.write_f32::<LittleEndian>(val).ok(); },
-                Value::Double(val) => { reader.write_f64::<LittleEndian>(val).ok(); },
-              }
-            },
-        }
-    // otherwise, do bit level writes
-    } else {
-        //println!("before bit_buffer.bits = {:b}, {} bits", bit_buffer.bits, field.typ.num_bits());
-        bit_buffer.push_value(field.value, field.typ.num_bits(), field.typ.endianness());
-        //println!("after  bit_buffer.bits = {:b}", bit_buffer.bits);
-
-        //println!("bits avail = {}", bit_buffer.bits_avail);
-        if bit_buffer.bits_avail % 8 == 0 {
-            // println!("Writing out {} bytes", bit_buffer.bits_avail / 8);
-            for _ in 0..(bit_buffer.bits_avail / 8) {
-                reader.write(&[bit_buffer.pull_byte()]);
-            }
-        }
+    for byte in bit_buffer {
+        reader.write(&[byte]).unwrap();
     }
 }
 
@@ -171,7 +128,7 @@ fn read_field<R>(reader: &mut R,
     let num_bits = template.typ.num_bits();
 
     match template.typ {
-        FieldType::Int(_, _) | FieldType::Uint(_, _) => {
+        FieldType::Int(_, _, _) | FieldType::Uint(_, _, _) => {
             let value: Value;
 
             // while we need more bits, push bytes from the reader into the decoder
@@ -184,11 +141,7 @@ fn read_field<R>(reader: &mut R,
                 }
             }
 
-            match template.typ {
-                FieldType::Int(_,  _) => { value = bit_buffer.pull_value_int(num_bits as u8)?; },
-                FieldType::Uint(_, _) => { value = bit_buffer.pull_value_uint(num_bits as u8)?; },
-                _ => panic!("This case should have been guarded by an above match!"),
-            }
+            value = bit_buffer.pull_value(&template.typ)?;
 
             Some(Field {
                 value: value,
@@ -240,20 +193,16 @@ fn read_field<R>(reader: &mut R,
     }
 }
 
-// TODO why is description not used? is this correct or not?
-fn write_field<W: Write>(writer: &mut W, field: &Field, description: &String) {
+fn write_field<W: Write>(writer: &mut W, field: &Field) {
     writer.write_all(&field.to_record().as_bytes()).unwrap();
 }
 
-// NOTE It would be better to use a syntax like
-// uint8_be:3 so you can specify both a type and a bitwidth, with the bitwidth
-// optional
 fn parse_type(type_str: &str) -> Option<FieldType> {
     let type_str = type_str.to_lowercase();
 
     lazy_static! {
       static ref TYPE_REGEX: Regex =
-          Regex::new(r"(float|double|int|uint)(\d{0,2})_(be|le)").unwrap();
+          Regex::new(r"(float|double|int|uint)(\d{0,2})_(be|le)(8|16|32|64)?").unwrap();
     }
     let matches = TYPE_REGEX.captures(&type_str)?;
 
@@ -261,10 +210,14 @@ fn parse_type(type_str: &str) -> Option<FieldType> {
         "uint" => {
             let num_bits = matches[2].parse::<NumBits>().ok()?;
 
-            match &matches[3] {
-                "be" => Some(FieldType::Uint(num_bits, Endianness::Big)),
+            let within_bits =
+                matches.get(4).map(|mat| BitSize::from_str_bits(mat.as_str()))
+                              .unwrap_or(BitSize::fits_within(num_bits));
 
-                "le" => Some(FieldType::Uint(num_bits, Endianness::Little)),
+            match &matches[3] {
+                "be" => Some(FieldType::Uint(num_bits, Endianness::Big, within_bits)),
+
+                "le" => Some(FieldType::Uint(num_bits, Endianness::Little, within_bits)),
 
                  _ => {
                      error!("Endianness '{}' not expected!", &matches[3]);
@@ -276,10 +229,14 @@ fn parse_type(type_str: &str) -> Option<FieldType> {
         "int" => {
             let num_bits = matches[2].parse::<NumBits>().ok()?;
 
-            match &matches[3] {
-                "be" => Some(FieldType::Int(num_bits, Endianness::Big)),
+            let within_bits =
+                matches.get(4).map(|mat| BitSize::from_str_bits(mat.as_str()))
+                             .unwrap_or(BitSize::fits_within(num_bits));
 
-                "le" => Some(FieldType::Int(num_bits, Endianness::Little)),
+            match &matches[3] {
+                "be" => Some(FieldType::Int(num_bits, Endianness::Big, within_bits)),
+
+                "le" => Some(FieldType::Int(num_bits, Endianness::Little, within_bits)),
 
                  _ => {
                      error!("Endianness '{}' not expected!", &matches[3]);
@@ -289,7 +246,11 @@ fn parse_type(type_str: &str) -> Option<FieldType> {
         },
 
         "float" => {
-            // NOTE should check that no bit size is given
+            // ensure that bit widths are not given for floating point numbers.
+            if matches.get(2).is_some() || matches.get(4).is_some() {
+                error!("Bit Width not supported for floats!")
+            }
+
             match &matches[3] {
                 "be" => Some(FieldType::Float(Endianness::Big)),
 
@@ -303,7 +264,11 @@ fn parse_type(type_str: &str) -> Option<FieldType> {
         },
 
         "double" => {
-            // NOTE should check that no bit size is given
+            // ensure that bit widths are not given for floating point numbers.
+            if matches.get(2).is_some() || matches.get(4).is_some() {
+                error!("Bit Width not supported for doubles!")
+            }
+
             match &matches[3] {
                 "be" => Some(FieldType::Double(Endianness::Big)),
 
@@ -400,7 +365,7 @@ fn decode(in_file: &String, out_file: &String, template_file: &String, repetitio
             let field = read_field(&mut input, &mut decoder_state, &template)?;
             info!("{}", field);
 
-            write_field(&mut output_file, &field, &template.description);
+            write_field(&mut output_file, &field);
 
             output_file.write_all(&b"\n"[..]).unwrap();
         }
