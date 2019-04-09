@@ -125,72 +125,26 @@ fn read_field<R>(reader: &mut R,
                  template: &Template) -> Option<Field>
     where R: ReadBytesExt {
 
-    let num_bits = template.typ.num_bits();
+    let value: Value;
 
-    match template.typ {
-        FieldType::Int(_, _, _) | FieldType::Uint(_, _, _) => {
-            let value: Value;
+    if bit_buffer.is_empty() {
+        for _ in 0..template.typ.bit_size().num_bytes() {
+            let byte = reader.read_u8().ok()?;
 
-            // while we need more bits, push bytes from the reader into the decoder
-            while (bit_buffer.bits_avail as usize) < num_bits {
-                let byte = reader.read_u8().ok()?;
-
-                match template.typ.endianness() {
-                    Endianness::Little => bit_buffer.push_byte_le(byte)?,
-                    Endianness::Big    => bit_buffer.push_byte_be(byte)?,
-                }
+            match template.typ.endianness() {
+                Endianness::Little => bit_buffer.push_byte_le(byte)?,
+                Endianness::Big    => bit_buffer.push_byte_be(byte)?,
             }
-
-            value = bit_buffer.pull_value(&template.typ)?;
-
-            Some(Field {
-                value: value,
-                typ: template.typ,
-                description: template.description.clone(),
-            })
-        },
-
-        FieldType::Float(endianness) => {
-            if bit_buffer.bits_avail != 0 {
-                error!("Tried to read a float from a bit offset!");
-                None
-            } else {
-                let value;
-
-                if endianness == Endianness::Little {
-                    value = Value::Float(reader.read_f32::<LittleEndian>().ok()?);
-                } else {
-                    value = Value::Float(reader.read_f32::<BigEndian>().ok()?);
-                }
-
-                Some(Field {
-                    value: value,
-                    typ: template.typ,
-                    description: template.description.clone(),
-                })
-            }
-        },
-
-        FieldType::Double(endianness) => {
-            if bit_buffer.bits_avail != 0 {
-                error!("Tried to read a double from a bit offset!");
-                None
-            } else {
-                let value;
-                if endianness == Endianness::Little {
-                    value = Value::Double(reader.read_f64::<LittleEndian>().ok()?);
-                } else {
-                    value = Value::Double(reader.read_f64::<BigEndian>().ok()?);
-                }
-
-                Some(Field {
-                    value: value,
-                    typ: template.typ,
-                    description: template.description.clone(),
-                })
-            }
-        },
+        }
     }
+
+    value = bit_buffer.pull_value(&template.typ)?;
+
+    Some(Field {
+        value: value,
+        typ: template.typ,
+        description: template.description.clone(),
+    })
 }
 
 fn write_field<W: Write>(writer: &mut W, field: &Field) {
@@ -417,6 +371,5 @@ fn main() {
             }
         },
     }
-
 }
 

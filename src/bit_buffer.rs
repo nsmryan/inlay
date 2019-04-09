@@ -162,6 +162,10 @@ impl BitBuffer {
         (self.bits_avail > 0) && (self.bits_avail % 8 == 0)
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.bits_avail == 0
+    }
+
     pub fn mask(&self) -> u64 {
         2u64.pow(self.bits_avail as u32) - 1
     }

@@ -4,6 +4,9 @@ use std::fmt;
 /// Rename usize for clarity when dealing with a number of bits.
 pub type NumBits = usize;
 
+/// Rename usize for clarity when dealing with a number of bytes.
+pub type NumBytes = usize;
+
 /// Signedness is used to indicate whether an integer is signed
 /// or unsigned.
 #[derive(Eq, PartialEq, Debug, Copy, Clone, Deserialize)]
@@ -82,6 +85,18 @@ impl FieldType {
             FieldType::Double(_) => 64,
         }
     }
+
+    pub fn bit_size(&self) -> BitSize {
+        match self {
+            FieldType::Int(_, _, bit_size) => *bit_size,
+
+            FieldType::Uint(_, _, bit_size) => *bit_size,
+
+            FieldType::Float(_) => BitSize::Bits32,
+
+            FieldType::Double(_) => BitSize::Bits64,
+        }
+    }
 }
 
 
@@ -104,6 +119,15 @@ impl BitSize {
             "32" => BitSize::Bits32,
             "64" => BitSize::Bits64,
             _    => panic!("{} chars not supports for BitSize"),
+        }
+    }
+
+    pub fn num_bytes(&self) -> NumBytes {
+        match self {
+            BitSize::Bits8  => 1,
+            BitSize::Bits16 => 2,
+            BitSize::Bits32 => 4,
+            BitSize::Bits64 => 8,
         }
     }
 
