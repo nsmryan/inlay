@@ -58,7 +58,7 @@ pub fn decode(in_file: &String, out_file: &String, template_file: &String, repet
     let mut templates: Vec<Template> = vec!();
     for record in lines.records() {
         let rec = record.ok()?;
-        let typ = FieldType::from_str(&rec[0])?;
+        let typ = FieldType::from_str(&rec[0]).ok()?;
         let desc = rec[1].to_string();
 
         let template: Template =

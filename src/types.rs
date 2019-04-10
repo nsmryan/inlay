@@ -106,7 +106,7 @@ impl FieldType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FieldParseError(());
 
-pub impl FromStr for FieldType {
+impl FromStr for FieldType {
     type Err = FieldParseError;
 
     fn from_str(type_str: &str) -> Result<FieldType, FieldParseError> {

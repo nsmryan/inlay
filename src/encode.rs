@@ -94,7 +94,7 @@ pub fn encode(in_file: &String, out_file: &String) -> Option<()> {
         let description = &rec[1];
         let value_str = &rec[2];
 
-        let typ = type_str.parse()?;
+        let typ = type_str.parse().ok()?;
 
         let field = to_field(typ, value_str, description.to_string());
         info!("{}", field);
