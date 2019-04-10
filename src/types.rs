@@ -41,6 +41,48 @@ pub enum FieldType {
     Double(Endianness),
 }
 
+impl FieldType {
+    pub fn u8(endianness: Endianness) -> FieldType {
+        FieldType::Uint(8, endianness, BitSize::Bits8)
+    }
+
+    pub fn u16(endianness: Endianness) -> FieldType {
+        FieldType::Uint(16, endianness, BitSize::Bits16)
+    }
+
+    pub fn u32(endianness: Endianness) -> FieldType {
+        FieldType::Uint(32, endianness, BitSize::Bits32)
+    }
+
+    pub fn u64(endianness: Endianness) -> FieldType {
+        FieldType::Uint(64, endianness, BitSize::Bits64)
+    }
+
+    pub fn i8(endianness: Endianness) -> FieldType {
+        FieldType::Int(8, endianness, BitSize::Bits8)
+    }
+
+    pub fn i16(endianness: Endianness) -> FieldType {
+        FieldType::Int(16, endianness, BitSize::Bits16)
+    }
+
+    pub fn i32(endianness: Endianness) -> FieldType {
+        FieldType::Int(32, endianness, BitSize::Bits32)
+    }
+
+    pub fn i64(endianness: Endianness) -> FieldType {
+        FieldType::Int(64, endianness, BitSize::Bits64)
+    }
+
+    pub fn float(endianness: Endianness) -> FieldType {
+        FieldType::Float(endianness)
+    }
+
+    pub fn double(endianness: Endianness) -> FieldType {
+        FieldType::Double(endianness)
+    }
+}
+
 impl fmt::Display for FieldType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -320,6 +362,46 @@ impl Field {
     pub fn to_record(&self) -> String {
         format!("{},{},{}", self.typ.to_string(), self.description, self.value.to_string())
     }
+
+    pub fn u8(val: u8, endianness: Endianness, descr: String) -> Field {
+        Field { value: Value::Uint8(val), typ: FieldType::u8(endianness), description: descr }
+    }
+
+    pub fn u16(val: u16, endianness: Endianness, descr: String) -> Field {
+        Field { value: Value::Uint16(val), typ: FieldType::u16(endianness), description: descr }
+    }
+
+    pub fn u32(val: u32, endianness: Endianness, descr: String) -> Field {
+        Field { value: Value::Uint32(val), typ: FieldType::u32(endianness), description: descr }
+    }
+
+    pub fn u64(val: u64, endianness: Endianness, descr: String) -> Field {
+        Field { value: Value::Uint64(val), typ: FieldType::u64(endianness), description: descr }
+    }
+
+    pub fn i8(val: i8, endianness: Endianness, descr: String) -> Field {
+        Field { value: Value::Int8(val), typ: FieldType::i8(endianness), description: descr }
+    }
+
+    pub fn i16(val: i16, endianness: Endianness, descr: String) -> Field {
+        Field { value: Value::Int16(val), typ: FieldType::i16(endianness), description: descr }
+    }
+
+    pub fn i32(val: i32, endianness: Endianness, descr: String) -> Field {
+        Field { value: Value::Int32(val), typ: FieldType::i32(endianness), description: descr }
+    }
+
+    pub fn i64(val: i64, endianness: Endianness, descr: String) -> Field {
+        Field { value: Value::Int64(val), typ: FieldType::i64(endianness), description: descr }
+    }
+
+    pub fn float(val: f32, endianness: Endianness, descr: String) -> Field {
+        Field { value: Value::Float(val), typ: FieldType::float(endianness), description: descr }
+    }
+
+    pub fn double(val: f64, endianness: Endianness, descr: String) -> Field {
+        Field { value: Value::Double(val), typ: FieldType::double(endianness), description: descr }
+    }
 }
 
 impl fmt::Display for Field {
@@ -337,3 +419,8 @@ pub struct Template {
     pub description: String,
 }
 
+impl Template {
+    pub fn new(typ: FieldType, descr: String) -> Template {
+        Template { typ: typ, description: descr }
+    }
+}

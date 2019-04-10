@@ -259,7 +259,13 @@ impl BitBuffer {
 
     pub fn pull_value(&mut self, typ: &FieldType) -> Option<Value> {
         let num_bits: u8 = typ.num_bits() as u8;
-        let mask = 2u64.pow(num_bits as u32) - 1;
+        let mask;
+        if num_bits < 64 {
+            mask = (1u64 << num_bits) - 1;
+        } else
+        {
+            mask = (-1i64) as u64;
+        }
 
         self.bits_avail -= num_bits;
 
@@ -267,7 +273,13 @@ impl BitBuffer {
         match typ.endianness() {
             Endianness::Little => {
                 value = self.bits & mask;
-                self.bits >>= num_bits;
+                self.bits = self.bits & !mask;
+
+                // if shifting by 64 bits, self.bits is already cleared,
+                // and this shift would cause an exception in debug builds
+                if num_bits < 64 {
+                    self.bits = self.bits >> num_bits;
+                }
             }
             Endianness::Big => {
                 value = (self.bits >> self.bits_avail) & mask;

@@ -1,7 +1,9 @@
 use std::io::BufReader;
 use std::fs::File;
 use std::io::Write;
+use std::io::Read;
 use std::str::FromStr;
+use std::io::Cursor;
 
 use byteorder::ReadBytesExt;
 
@@ -36,26 +38,176 @@ fn read_field<R>(reader: &mut R,
     })
 }
 
+#[test]
+fn test_read_field_be() {
+    let mut buffer: Vec<u8> = vec!(1, 0, 2, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4);
+
+    let descr = "Field".to_string();
+    let endianness = Endianness::Big;
+
+    let byte = Template::new(FieldType::u8(endianness), descr.clone());
+    let word = Template::new(FieldType::u16(endianness), descr.clone());
+    let doubleword = Template::new(FieldType::u32(endianness), descr.clone());
+    let quadword = Template::new(FieldType::u64(endianness), descr.clone());
+
+    let field1 = Field::u8(1, endianness, descr.clone());
+    let field2 = Field::u16(2, endianness, descr.clone());
+    let field3 = Field::u32(3, endianness, descr.clone());
+    let field4 = Field::u64(4, endianness, descr.clone());
+
+    let mut cursor = Cursor::new(buffer.as_mut_slice());
+
+    let mut bit_buffer = Default::default();
+
+    assert!(read_field(&mut cursor, &mut bit_buffer, &byte) == Some(field1));
+    assert!(read_field(&mut cursor, &mut bit_buffer, &word) == Some(field2));
+    assert!(read_field(&mut cursor, &mut bit_buffer, &doubleword) == Some(field3));
+    assert!(read_field(&mut cursor, &mut bit_buffer, &quadword) == Some(field4));
+}
+
+#[test]
+fn test_read_field_le_byte() {
+    let mut buffer: Vec<u8> = vec!(1, 2, 0, 3, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0);
+
+    let descr = "Field".to_string();
+    let endianness = Endianness::Little;
+    let byte = Template::new(FieldType::u8(endianness), descr.clone());
+    let word = Template::new(FieldType::u16(endianness), descr.clone());
+    let doubleword = Template::new(FieldType::u32(endianness), descr.clone());
+    let quadword = Template::new(FieldType::u64(endianness), descr.clone());
+
+    let field1 = Field::u8(1, endianness, descr.clone());
+    let field2 = Field::u16(2, endianness, descr.clone());
+    let field3 = Field::u32(3, endianness, descr.clone());
+    let field4 = Field::u64(4, endianness, descr.clone());
+
+    let mut cursor = Cursor::new(buffer.as_mut_slice());
+
+    let mut bit_buffer = Default::default();
+
+    assert!(read_field(&mut cursor, &mut bit_buffer, &byte) == Some(field1));
+    assert!(read_field(&mut cursor, &mut bit_buffer, &word) == Some(field2));
+    assert!(read_field(&mut cursor, &mut bit_buffer, &doubleword) == Some(field3));
+    assert!(read_field(&mut cursor, &mut bit_buffer, &quadword) == Some(field4));
+}
+
+
+#[test]
+fn test_read_field_le_bitfields_byte() {
+    let byte = 0xA5;
+
+    let mut buffer: Vec<u8> = vec!(byte);
+
+    let descr = "Field".to_string();
+    let endianness = Endianness::Little;
+
+    let mut cursor = Cursor::new(buffer.as_mut_slice());
+
+    let typ = FieldType::Uint(1, endianness, BitSize::Bits8);
+
+    let mut bit_buffer = Default::default();
+
+    for index in 0..8 {
+        let field = read_field(&mut cursor,
+                               &mut bit_buffer,
+                               &Template::new(typ, descr.clone()));
+        assert_eq!(field, Some(Field { value: Value::Uint8((byte >> index) & 1), typ: typ, description: descr.clone() }));
+    }
+}
+
+#[test]
+fn test_read_field_be_bitfields_word() {
+    let mut buffer: Vec<u8> = vec!(0x12, 0x34, 0x56, 0x78);
+
+    let descr = "Field".to_string();
+    let endianness = Endianness::Big;
+
+    let mut cursor = Cursor::new(buffer.as_mut_slice());
+
+    let mut bit_buffer = Default::default();
+
+    let field = read_field(&mut cursor,
+                           &mut bit_buffer,
+                           &Template::new(FieldType::Uint(4, endianness, BitSize::Bits16), descr.clone()));
+    assert_eq!(field, Some(Field { value: Value::Uint8(1),
+                                   typ: FieldType::Uint(4, endianness, BitSize::Bits16),
+                                   description: descr.clone() }));
+
+    let field = read_field(&mut cursor,
+                           &mut bit_buffer,
+                           &Template::new(FieldType::Uint(8, endianness, BitSize::Bits16), descr.clone()));
+    assert_eq!(field, Some(Field { value: Value::Uint8(0x23),
+                                   typ: FieldType::Uint(8, endianness, BitSize::Bits16),
+                                   description: descr.clone() }));
+
+    let field = read_field(&mut cursor,
+                           &mut bit_buffer,
+                           &Template::new(FieldType::Uint(2, endianness, BitSize::Bits16), descr.clone()));
+    assert_eq!(field, Some(Field { value: Value::Uint8(0x01),
+                                   typ: FieldType::Uint(2, endianness, BitSize::Bits16),
+                                   description: descr.clone() }));
+
+    let field = read_field(&mut cursor,
+                           &mut bit_buffer,
+                           &Template::new(FieldType::Uint(2, endianness, BitSize::Bits16), descr.clone()));
+    assert_eq!(field, Some(Field { value: Value::Uint8(0x00),
+                                   typ: FieldType::Uint(2, endianness, BitSize::Bits16),
+                                   description: descr.clone() }));
+}
+
+#[test]
+fn test_read_field_le_bitfields_word() {
+    let mut buffer: Vec<u8> = vec!(0x35, 0x12, 0x56, 0x78);
+
+    let descr = "Field".to_string();
+    let endianness = Endianness::Little;
+
+    let mut cursor = Cursor::new(buffer.as_mut_slice());
+
+    let mut bit_buffer = Default::default();
+
+    let field = read_field(&mut cursor,
+                           &mut bit_buffer,
+                           &Template::new(FieldType::Uint(4, endianness, BitSize::Bits16), descr.clone()));
+    assert_eq!(field, Some(Field { value: Value::Uint8(5),
+                                   typ: FieldType::Uint(4, endianness, BitSize::Bits16),
+                                   description: descr.clone() }));
+
+    let field = read_field(&mut cursor,
+                           &mut bit_buffer,
+                           &Template::new(FieldType::Uint(8, endianness, BitSize::Bits16), descr.clone()));
+    assert_eq!(field, Some(Field { value: Value::Uint8(0x23),
+                                   typ: FieldType::Uint(8, endianness, BitSize::Bits16),
+                                   description: descr.clone() }));
+
+    let field = read_field(&mut cursor,
+                           &mut bit_buffer,
+                           &Template::new(FieldType::Uint(2, endianness, BitSize::Bits16), descr.clone()));
+    assert_eq!(field, Some(Field { value: Value::Uint8(0x01),
+                                   typ: FieldType::Uint(2, endianness, BitSize::Bits16),
+                                   description: descr.clone() }));
+
+    let field = read_field(&mut cursor,
+                           &mut bit_buffer,
+                           &Template::new(FieldType::Uint(2, endianness, BitSize::Bits16), descr.clone()));
+    assert_eq!(field, Some(Field { value: Value::Uint8(0x00),
+                                   typ: FieldType::Uint(2, endianness, BitSize::Bits16),
+                                   description: descr.clone() }));
+}
+
 fn write_field<W: Write>(writer: &mut W, field: &Field) {
     writer.write_all(&field.to_record().as_bytes()).unwrap();
 }
 
-pub fn decode(in_file: &String, out_file: &String, template_file: &String, repetitions: isize) -> Option<()> {
-    let input_file =
-        File::open(&in_file).expect(&format!("Could not open input file '{}'!", &in_file));
-    let mut input = BufReader::new(input_file);
+fn read_templates(template_file: &String) -> Option<Vec<Template>> {
+    let mut templates: Vec<Template> = vec!();
 
     let template: File =
         File::open(&template_file).expect(&format!("Could not open template file '{}'!", &template_file));
     let mut lines = csv::Reader::from_reader(&template);
-    info!("Opened {}", &template_file);
-
-    let mut output_file =
-        File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
-
+    info!("Opened Template File {}", &template_file);
 
     // Decode template from input file.
-    let mut templates: Vec<Template> = vec!();
     for record in lines.records() {
         let rec = record.ok()?;
         let typ = FieldType::from_str(&rec[0]).ok()?;
@@ -70,10 +222,24 @@ pub fn decode(in_file: &String, out_file: &String, template_file: &String, repet
         templates.push(template);
     }
 
+    Some(templates)
+}
+
+pub fn decode(in_file: &String, out_file: &String, template_file: &String, repetitions: isize) -> Option<()> {
+    let input_file =
+        File::open(&in_file).expect(&format!("Could not open input file '{}'!", &in_file));
+    let mut input = BufReader::new(input_file);
+
+    let mut output_file =
+        File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
+
+    let templates = read_templates(template_file)?;
+
     // Decode binary data, writing out to csv file.
     output_file.write_all(&"type,description,value\n".to_string().as_bytes()).unwrap();
-    let mut decoder_state = Default::default();
     for _ in 0..repetitions {
+        let mut decoder_state = Default::default();
+
         for template in templates.iter() {
             let field = read_field(&mut input, &mut decoder_state, &template)?;
 
@@ -89,3 +255,4 @@ pub fn decode(in_file: &String, out_file: &String, template_file: &String, repet
 
     Some(())
 }
+
