@@ -1,4 +1,7 @@
 use std::fmt;
+use std::str::FromStr;
+
+use regex::Regex;
 
 
 /// Rename usize for clarity when dealing with a number of bits.
@@ -97,7 +100,108 @@ impl FieldType {
             FieldType::Double(_) => BitSize::Bits64,
         }
     }
+
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FieldParseError(());
+
+pub impl FromStr for FieldType {
+    type Err = FieldParseError;
+
+    fn from_str(type_str: &str) -> Result<FieldType, FieldParseError> {
+        lazy_static! {
+          static ref TYPE_REGEX: Regex =
+              Regex::new(r"(float|double|int|uint)(\d{0,2})_(be|le)(8|16|32|64)?").unwrap();
+        }
+
+        let type_str = type_str.to_lowercase();
+
+        let matches = TYPE_REGEX.captures(&type_str).ok_or(FieldParseError(()))?;
+
+        match &matches[1] {
+            "uint" => {
+                let num_bits = matches[2].parse::<NumBits>().or(Err(FieldParseError(())))?;
+
+                let within_bits =
+                    matches.get(4).map(|mat| BitSize::from_str_bits(mat.as_str()))
+                                  .unwrap_or(BitSize::fits_within(num_bits));
+
+                match &matches[3] {
+                    "be" => Ok(FieldType::Uint(num_bits, Endianness::Big, within_bits)),
+
+                    "le" => Ok(FieldType::Uint(num_bits, Endianness::Little, within_bits)),
+
+                     _ => {
+                         error!("Endianness '{}' not expected!", &matches[3]);
+                         Err(FieldParseError(()))
+                     },
+                }
+            },
+
+            "int" => {
+                let num_bits = matches[2].parse::<NumBits>().or(Err(FieldParseError(())))?;
+
+                let within_bits =
+                    matches.get(4).map(|mat| BitSize::from_str_bits(mat.as_str()))
+                                 .unwrap_or(BitSize::fits_within(num_bits));
+
+                match &matches[3] {
+                    "be" => Ok(FieldType::Int(num_bits, Endianness::Big, within_bits)),
+
+                    "le" => Ok(FieldType::Int(num_bits, Endianness::Little, within_bits)),
+
+                     _ => {
+                         error!("Endianness '{}' not expected!", &matches[3]);
+                         Err(FieldParseError(()))
+                     },
+                }
+            },
+
+            "float" => {
+                // ensure that bit widths are not given for floating point numbers.
+                if matches.get(2).is_some() || matches.get(4).is_some() {
+                    error!("Bit Width not supported for floats!")
+                }
+
+                match &matches[3] {
+                    "be" => Ok(FieldType::Float(Endianness::Big)),
+
+                    "le" => Ok(FieldType::Float(Endianness::Little)),
+
+                     _ => {
+                         error!("Endianness '{}' not expected!", &matches[3]);
+                         Err(FieldParseError(()))
+                     },
+                }
+            },
+
+            "double" => {
+                // ensure that bit widths are not given for floating point numbers.
+                if matches.get(2).is_some() || matches.get(4).is_some() {
+                    error!("Bit Width not supported for doubles!")
+                }
+
+                match &matches[3] {
+                    "be" => Ok(FieldType::Double(Endianness::Big)),
+
+                    "le" => Ok(FieldType::Double(Endianness::Little)),
+
+                     _ => {
+                         error!("Endianness '{}' not expected!", &matches[3]);
+                         Err(FieldParseError(()))
+                     },
+                }
+            },
+
+            _ => {
+                error!("Type '{}' unexpected in field type '{}'", &matches[1], type_str);
+                Err(FieldParseError(()))
+            }
+        }
+    }
+}
+
 
 
 /// A BitSize is a number of bits for a particular field.
