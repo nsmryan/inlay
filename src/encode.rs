@@ -47,6 +47,31 @@ fn to_value(typ: FieldType, value_str: &str) -> Value {
   }
 }
 
+#[test]
+fn test_encode_to_value() {
+    assert_eq!(to_value(FieldType::u8(Endianness::Big), "1"), Value::Uint8(1));
+    assert_eq!(to_value(FieldType::u16(Endianness::Big), "1"), Value::Uint16(1));
+    assert_eq!(to_value(FieldType::u32(Endianness::Big), "1"), Value::Uint32(1));
+    assert_eq!(to_value(FieldType::u64(Endianness::Big), "1"), Value::Uint64(1));
+    assert_eq!(to_value(FieldType::i8(Endianness::Big), "1"), Value::Int8(1));
+    assert_eq!(to_value(FieldType::i16(Endianness::Big), "1"), Value::Int16(1));
+    assert_eq!(to_value(FieldType::i32(Endianness::Big), "1"), Value::Int32(1));
+    assert_eq!(to_value(FieldType::i64(Endianness::Big), "1"), Value::Int64(1));
+    assert_eq!(to_value(FieldType::float(Endianness::Big), "1.0"), Value::Float(1.0));
+    assert_eq!(to_value(FieldType::double(Endianness::Big), "1.0"), Value::Double(1.0));
+
+    assert_eq!(to_value(FieldType::u8(Endianness::Little), "1"), Value::Uint8(1));
+    assert_eq!(to_value(FieldType::u16(Endianness::Little), "1"), Value::Uint16(1));
+    assert_eq!(to_value(FieldType::u32(Endianness::Little), "1"), Value::Uint32(1));
+    assert_eq!(to_value(FieldType::u64(Endianness::Little), "1"), Value::Uint64(1));
+    assert_eq!(to_value(FieldType::i8(Endianness::Little), "1"), Value::Int8(1));
+    assert_eq!(to_value(FieldType::i16(Endianness::Little), "1"), Value::Int16(1));
+    assert_eq!(to_value(FieldType::i32(Endianness::Little), "1"), Value::Int32(1));
+    assert_eq!(to_value(FieldType::i64(Endianness::Little), "1"), Value::Int64(1));
+    assert_eq!(to_value(FieldType::float(Endianness::Little), "1.0"), Value::Float(1.0));
+    assert_eq!(to_value(FieldType::double(Endianness::Little), "1.0"), Value::Double(1.0));
+}
+
 fn to_field(typ: FieldType, value_str: &str, description: String) -> Field {
     let value = to_value(typ, value_str);
     Field {
@@ -56,13 +81,13 @@ fn to_field(typ: FieldType, value_str: &str, description: String) -> Field {
     }
 }
 
-fn write_out<R>(reader: &mut R, field: &Field, bit_buffer: &mut BitBuffer)
-    where R: Read + WriteBytesExt {
+fn write_out<W>(writer: &mut W, field: &Field, bit_buffer: &mut BitBuffer)
+    where W: WriteBytesExt {
 
     bit_buffer.push_value(field.value, field.typ.num_bits(), field.typ.endianness());
 
     for byte in bit_buffer {
-        reader.write(&[byte]).unwrap();
+        writer.write(&[byte]).unwrap();
     }
 }
 

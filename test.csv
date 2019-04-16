@@ -2,4 +2,13 @@ typ,description,value
 uint3_be:16,test1,1
 uint1_be:16,test2,1
 uint4_be:16,test3,1
+uint8_be:16,test3,3
+uint1_be:8,test1,1
+uint1_be:8,test1,0
+uint1_be:8,test1,1
+uint1_be:8,test1,0
+uint1_be:8,test1,0
+uint1_be:8,test1,1
+uint1_be:8,test1,0
+uint1_be:8,test1,1
 uint16_be,test4,65535
