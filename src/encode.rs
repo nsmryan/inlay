@@ -15,25 +15,28 @@ pub fn encode(in_file: &String, out_file: &String, rows: bool) -> Option<()> {
 
     let mut lines = csv::Reader::from_reader(file);
 
-    let header_line = lines.headers().ok()?;
-
     let mut output = File::create(&out_file).ok()?;
 
     let mut bit_buffer: BitBuffer = Default::default();
 
+
     for record in lines.records() {
         let rec = record.ok()?;
 
-        let type_str = &rec[0];
-        let description = &rec[1];
-        let value_str = &rec[2];
+        // if processing rows, each row contains a field
+        if rows {
+            let type_str = &rec[0];
+            let description = &rec[1];
+            let value_str = &rec[2];
 
-        let typ = type_str.parse().ok()?;
+            let typ = type_str.parse().ok()?;
 
-        let field = to_field(typ, value_str, description.to_string());
-        info!("{}", field);
+            let field = to_field(typ, value_str, description.to_string());
+            info!("{}", field);
 
-        write_out(&mut output, &field, &mut bit_buffer);
+            write_out(&mut output, &field, &mut bit_buffer);
+        } else { // if processing columns, each row contains a list of fields
+        }
     }
 
     info!("Finished writing to {}", &out_file);
