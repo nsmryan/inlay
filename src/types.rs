@@ -1,5 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
+use std::vec::*;
+use std::iter::*;
 
 use regex::Regex;
 
@@ -9,6 +11,16 @@ pub type NumBits = usize;
 
 /// Rename usize for clarity when dealing with a number of bytes.
 pub type NumBytes = usize;
+
+pub trait HasNumBits {
+    fn num_bits(&self) -> NumBits;
+}
+
+impl<A: HasNumBits> HasNumBits for Vec<A> {
+    fn num_bits(&self) -> NumBits {
+        self.iter().fold(0, |sum, value| value.num_bits() + sum)
+    }
+}
 
 /// Signedness is used to indicate whether an integer is signed
 /// or unsigned.
@@ -39,6 +51,17 @@ pub enum FieldType {
 
     /// Double Precision Float
     Double(Endianness),
+}
+
+impl HasNumBits for FieldType {
+    fn num_bits(&self) -> NumBits {
+        match self {
+            FieldType::Int(num_bits, _, _) => *num_bits,
+            FieldType::Uint(num_bits, _, _) => *num_bits,
+            FieldType::Float(_) => 32,
+            FieldType::Double(_) => 64,
+        }
+    }
 }
 
 impl FieldType {
@@ -86,12 +109,23 @@ impl FieldType {
 impl fmt::Display for FieldType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            FieldType::Int(num_bits, endianness, _) => {
-                write!(f, "int{}_{}", num_bits, endianness.to_string())
+            FieldType::Int(num_bits, endianness, bit_size) => {
+                if *num_bits != bit_size.num_bits() {
+                    write!(f, "int{}_{}:{}", num_bits, endianness.to_string(), bit_size.num_bits())
+                }
+                else
+                {
+                    write!(f, "int{}_{}", num_bits, endianness.to_string())
+                }
             },
 
-            FieldType::Uint(num_bits, endianness, _) => {
-                write!(f, "uint{}_{}", num_bits, endianness.to_string())
+            FieldType::Uint(num_bits, endianness, bit_size) => {
+                if *num_bits != bit_size.num_bits() {
+                    write!(f, "uint{}_{}:{}", num_bits, endianness.to_string(), bit_size.num_bits())
+                } else
+                {
+                    write!(f, "uint{}_{}", num_bits, endianness.to_string())
+                }
             },
 
             FieldType::Float(endianness) => {
@@ -154,7 +188,7 @@ impl FromStr for FieldType {
     fn from_str(type_str: &str) -> Result<FieldType, FieldParseError> {
         lazy_static! {
           static ref TYPE_REGEX: Regex =
-              Regex::new(r"(float|double|int|uint)(\d{0,2})_(be|le)(8|16|32|64)?").unwrap();
+              Regex::new(r"(float|double|int|uint)(\d{0,2})_(be|le)(:8|:16|:32|:64)?").unwrap();
         }
 
         let type_str = type_str.to_lowercase();
@@ -166,7 +200,7 @@ impl FromStr for FieldType {
                 let num_bits = matches[2].parse::<NumBits>().or(Err(FieldParseError(())))?;
 
                 let within_bits =
-                    matches.get(4).map(|mat| BitSize::from_str_bits(mat.as_str()))
+                    matches.get(4).map(|mat| BitSize::from_str_bits(&mat.as_str()[1..]))
                                   .unwrap_or(BitSize::fits_within(num_bits));
 
                 match &matches[3] {
@@ -185,7 +219,7 @@ impl FromStr for FieldType {
                 let num_bits = matches[2].parse::<NumBits>().or(Err(FieldParseError(())))?;
 
                 let within_bits =
-                    matches.get(4).map(|mat| BitSize::from_str_bits(mat.as_str()))
+                    matches.get(4).map(|mat| BitSize::from_str_bits(&mat.as_str()[1..]))
                                  .unwrap_or(BitSize::fits_within(num_bits));
 
                 match &matches[3] {
@@ -201,11 +235,6 @@ impl FromStr for FieldType {
             },
 
             "float" => {
-                // ensure that bit widths are not given for floating point numbers.
-                if matches.get(2).is_some() || matches.get(4).is_some() {
-                    error!("Bit Width not supported for floats!")
-                }
-
                 match &matches[3] {
                     "be" => Ok(FieldType::Float(Endianness::Big)),
 
@@ -219,11 +248,6 @@ impl FromStr for FieldType {
             },
 
             "double" => {
-                // ensure that bit widths are not given for floating point numbers.
-                if matches.get(2).is_some() || matches.get(4).is_some() {
-                    error!("Bit Width not supported for doubles!")
-                }
-
                 match &matches[3] {
                     "be" => Ok(FieldType::Double(Endianness::Big)),
 
@@ -243,7 +267,6 @@ impl FromStr for FieldType {
         }
     }
 }
-
 
 
 /// A BitSize is a number of bits for a particular field.
@@ -292,6 +315,12 @@ impl BitSize {
     }
 }
 
+impl HasNumBits for BitSize {
+    fn num_bits(&self) -> NumBits {
+        self.num_bytes() * 8
+    }
+}
+
 /// A value is a primitive binary object.
 /// These can be 8/16/32/64 bit signed/unsigned integers,
 /// of single/double precision floats.
@@ -322,6 +351,23 @@ impl Value {
             Value::Int64(val)  => format!("{}", val),
             Value::Float(val)  => format!("{}", val),
             Value::Double(val) => format!("{}", val),
+        }
+    }
+}
+
+impl HasNumBits for Value {
+    fn num_bits(&self) -> NumBits {
+        match self {
+            Value::Uint8(val)  => 8,
+            Value::Int8(val)   => 8,
+            Value::Uint16(val) => 16,
+            Value::Int16(val)  => 16,
+            Value::Uint32(val) => 32,
+            Value::Int32(val)  => 32,
+            Value::Uint64(val) => 64,
+            Value::Int64(val)  => 64,
+            Value::Float(val)  => 32,
+            Value::Double(val) => 64,
         }
     }
 }
@@ -410,17 +456,9 @@ impl fmt::Display for Field {
     }
 }
 
-/// A template gives enough information to decode a field from a binary file,
-/// providing the type information used for decoding as well as a description of the
-/// field.
-#[derive(Eq, PartialEq, Debug, Clone, Deserialize)]
-pub struct Template {
-    pub typ: FieldType,
-    pub description: String,
-}
-
-impl Template {
-    pub fn new(typ: FieldType, descr: String) -> Template {
-        Template { typ: typ, description: descr }
+impl HasNumBits for Field {
+    fn num_bits(&self) -> NumBits {
+        self.typ.num_bits()
     }
 }
+

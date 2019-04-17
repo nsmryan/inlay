@@ -1,13 +1,13 @@
-use std::io::BufReader;
 use std::fs::File;
+use std::io::BufReader;
 use std::io::Write;
-use std::io::Read;
-use std::str::FromStr;
 use std::io::Cursor;
+use std::io::Read;
 
 use byteorder::ReadBytesExt;
 
 use crate::types::*;
+use crate::template::*;
 use crate::bit_buffer::*;
 
 
@@ -199,33 +199,7 @@ fn write_field<W: Write>(writer: &mut W, field: &Field) {
     writer.write_all(&field.to_record().as_bytes()).unwrap();
 }
 
-fn read_templates(template_file: &String) -> Option<Vec<Template>> {
-    let mut templates: Vec<Template> = vec!();
-
-    let template: File =
-        File::open(&template_file).expect(&format!("Could not open template file '{}'!", &template_file));
-    let mut lines = csv::Reader::from_reader(&template);
-    info!("Opened Template File {}", &template_file);
-
-    // Decode template from input file.
-    for record in lines.records() {
-        let rec = record.ok()?;
-        let typ = FieldType::from_str(&rec[0]).ok()?;
-        let desc = rec[1].to_string();
-
-        let template: Template =
-            Template {
-                typ: typ,
-                description: desc,
-            };
-
-        templates.push(template);
-    }
-
-    Some(templates)
-}
-
-pub fn decode(in_file: &String, out_file: &String, template_file: &String, repetitions: isize) -> Option<()> {
+pub fn decode(in_file: &String, out_file: &String, templates: &Vec<Template>) -> Option<()> {
     let input_file =
         File::open(&in_file).expect(&format!("Could not open input file '{}'!", &in_file));
     let mut input = BufReader::new(input_file);
@@ -233,15 +207,22 @@ pub fn decode(in_file: &String, out_file: &String, template_file: &String, repet
     let mut output_file =
         File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
 
-    let templates = read_templates(template_file)?;
+
+    let template_bytes = templates.num_bits() / 8;
+    let mut cursor = Cursor::new(vec![0; template_bytes]);
 
     // Decode binary data, writing out to csv file.
     output_file.write_all(&"type,description,value\n".to_string().as_bytes()).unwrap();
-    for _ in 0..repetitions {
+    while true {
         let mut decoder_state = Default::default();
 
+        // if we get a read error, we are at the end of input, so just exit cleanly
+        if let Err(_) = input.read_exact(cursor.get_mut()) {
+            return None;
+        }
+
         for template in templates.iter() {
-            let field = read_field(&mut input, &mut decoder_state, &template)?;
+            let field = read_field(&mut cursor, &mut decoder_state, &template)?;
 
             info!("{}", field);
 

@@ -9,8 +9,6 @@ extern crate loggerv;
 extern crate glob;
 
 
-use std::fs::File;
-
 use structopt::StructOpt;
 
 use log::{Level};
@@ -25,6 +23,9 @@ use encode::*;
 mod decode;
 use decode::*;
 
+mod template;
+use template::*;
+
 
 #[derive(Debug, StructOpt)]
 #[structopt(name="inlay", about="A command line tool for quickly reading and writing simple binary formats")]
@@ -36,7 +37,7 @@ enum Opt {
         #[structopt(short="o", long="output", default_value="")]
         out_file: String,
 
-        #[structopt(short="l", long="log-level", default_value="info")]
+        #[structopt(short="l", long="log-level", default_value="error")]
         log_level: Level,
      },
 
@@ -50,10 +51,7 @@ enum Opt {
         #[structopt(short="t", long="template")]
         template_file: String,
 
-        #[structopt(short="r", long="repeat", default_value="1")]
-        repetitions: isize,
-
-        #[structopt(short="l", long="log-level", default_value="info")]
+        #[structopt(short="l", long="log-level", default_value="error")]
         log_level: Level,
      },
 }
@@ -81,20 +79,26 @@ fn main() {
             }
         },
 
-        Opt::Decode { in_files, out_file, template_file, repetitions, log_level } => {
+        Opt::Decode { in_files, out_file, template_file, log_level } => {
             loggerv::init_with_level(log_level).unwrap();
 
             if in_files.len() > 1 && out_file.len() > 0 {
                 error!("Outfile not supported when run with multiple input files!");
-            } else if out_file.len() > 0 {
-                for in_file in in_files {
-                    decode(&in_file, &out_file, &template_file, repetitions);
-                }
             } else {
-                for in_file in in_files {
-                    let mut out_file = in_file.clone();
-                    out_file.push_str(".csv");
-                    decode(&in_file, &out_file, &template_file, repetitions);
+                if let Some(templates) = Template::read_templates(&template_file) {
+                    if out_file.len() > 0 {
+                        for in_file in in_files {
+                            decode(&in_file, &out_file, &templates);
+                        }
+                    } else {
+                        for in_file in in_files {
+                            let mut out_file = in_file.clone();
+                            out_file.push_str(".csv");
+                            decode(&in_file, &out_file, &templates);
+                        }
+                    }
+                } else {
+                    panic!("Could not parse template file!");
                 }
             }
         },
