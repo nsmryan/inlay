@@ -11,38 +11,7 @@ use crate::template::*;
 use crate::bit_buffer::*;
 
 
-fn read_field<R>(reader: &mut R,
-                 bit_buffer: &mut BitBuffer,
-                 template: &Template) -> Option<Field>
-    where R: ReadBytesExt {
-
-    let value: Value;
-
-    if bit_buffer.is_empty() {
-        for _ in 0..template.typ.bit_size().num_bytes() {
-            let byte = reader.read_u8().ok()?;
-
-            match template.typ.endianness() {
-                Endianness::Little => bit_buffer.push_byte_le(byte)?,
-                Endianness::Big    => bit_buffer.push_byte_be(byte)?,
-            }
-        }
-    }
-
-    value = bit_buffer.pull_value(&template.typ)?;
-
-    Some(Field {
-        value: value,
-        typ: template.typ,
-        description: template.description.clone(),
-    })
-}
-
-fn write_field<W: Write>(writer: &mut W, field: &Field) {
-    writer.write_all(&field.to_record().as_bytes()).unwrap();
-}
-
-pub fn decode(in_file: &String, out_file: &String, templates: &Vec<Template>) -> Option<()> {
+pub fn decode(in_file: &String, out_file: &String, templates: &Vec<Template>, rows: bool) -> Option<()> {
     let input_file =
         File::open(&in_file).expect(&format!("Could not open input file '{}'!", &in_file));
     let mut input = BufReader::new(input_file);
@@ -78,6 +47,37 @@ pub fn decode(in_file: &String, out_file: &String, templates: &Vec<Template>) ->
     info!("Finished writing to {}", &out_file);
 
     Some(())
+}
+
+fn read_field<R>(reader: &mut R,
+                 bit_buffer: &mut BitBuffer,
+                 template: &Template) -> Option<Field>
+    where R: ReadBytesExt {
+
+    let value: Value;
+
+    if bit_buffer.is_empty() {
+        for _ in 0..template.typ.bit_size().num_bytes() {
+            let byte = reader.read_u8().ok()?;
+
+            match template.typ.endianness() {
+                Endianness::Little => bit_buffer.push_byte_le(byte)?,
+                Endianness::Big    => bit_buffer.push_byte_be(byte)?,
+            }
+        }
+    }
+
+    value = bit_buffer.pull_value(&template.typ)?;
+
+    Some(Field {
+        value: value,
+        typ: template.typ,
+        description: template.description.clone(),
+    })
+}
+
+fn write_field<W: Write>(writer: &mut W, field: &Field) {
+    writer.write_all(&field.to_record().as_bytes()).unwrap();
 }
 
 #[test]

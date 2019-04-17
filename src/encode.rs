@@ -6,6 +6,41 @@ use crate::types::*;
 use crate::bit_buffer::*;
 
 
+pub fn encode(in_file: &String, out_file: &String, rows: bool) -> Option<()> {
+    let file = File::open(&in_file).or_else(|err| { error!("Could not open input file '{}'!", &in_file);
+                                                    Err(err)
+                                                   }).ok().unwrap();
+
+    info!("Opened {}", &in_file);
+
+    let mut lines = csv::Reader::from_reader(file);
+
+    let header_line = lines.headers().ok()?;
+
+    let mut output = File::create(&out_file).ok()?;
+
+    let mut bit_buffer: BitBuffer = Default::default();
+
+    for record in lines.records() {
+        let rec = record.ok()?;
+
+        let type_str = &rec[0];
+        let description = &rec[1];
+        let value_str = &rec[2];
+
+        let typ = type_str.parse().ok()?;
+
+        let field = to_field(typ, value_str, description.to_string());
+        info!("{}", field);
+
+        write_out(&mut output, &field, &mut bit_buffer);
+    }
+
+    info!("Finished writing to {}", &out_file);
+
+    Some(())
+}
+
 fn to_value(typ: FieldType, value_str: &str) -> Value {
   match typ {
     FieldType::Int(num_bits, _, _) => {
@@ -63,47 +98,6 @@ fn write_out<W>(writer: &mut W, field: &Field, bit_buffer: &mut BitBuffer)
     for byte in bit_buffer {
         writer.write(&[byte]).unwrap();
     }
-}
-
-pub fn encode(in_file: &String, out_file: &String) -> Option<()> {
-    let file;
-
-    match File::open(&in_file) {
-        Ok(file_handle) => file = file_handle,
-        Err(_) => {
-            error!("Could not open input file '{}'!", &in_file);
-            return Some(());
-        },
-    }
-
-    info!("Opened {}", &in_file);
-
-    let mut lines = csv::Reader::from_reader(file);
-
-    let header_line = lines.headers().ok()?;
-
-    let mut output = File::create(&out_file).ok()?;
-
-    let mut bit_buffer: BitBuffer = Default::default();
-
-    for record in lines.records() {
-        let rec = record.ok()?;
-
-        let type_str = &rec[0];
-        let description = &rec[1];
-        let value_str = &rec[2];
-
-        let typ = type_str.parse().ok()?;
-
-        let field = to_field(typ, value_str, description.to_string());
-        info!("{}", field);
-
-        write_out(&mut output, &field, &mut bit_buffer);
-    }
-
-    info!("Finished writing to {}", &out_file);
-
-    Some(())
 }
 
 #[test]

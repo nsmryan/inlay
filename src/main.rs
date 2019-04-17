@@ -8,22 +8,18 @@ extern crate byteorder;
 extern crate loggerv;
 extern crate glob;
 
+mod types;
+mod bit_buffer;
+mod encode;
+mod decode;
+mod template;
 
 use structopt::StructOpt;
 
 use log::{Level};
 
-mod types;
-
-mod bit_buffer;
-
-mod encode;
 use encode::*;
-
-mod decode;
 use decode::*;
-
-mod template;
 use template::*;
 
 
@@ -39,6 +35,9 @@ enum Opt {
 
         #[structopt(short="l", long="log-level", default_value="error")]
         log_level: Level,
+
+        #[structopt(short="r", long="rows")]
+        rows: bool,
      },
 
      #[structopt(name="decode")]
@@ -53,33 +52,37 @@ enum Opt {
 
         #[structopt(short="l", long="log-level", default_value="error")]
         log_level: Level,
+
+        #[structopt(short="r", long="rows")]
+        rows: bool,
      },
 }
 
 fn main() {
     let opt = Opt::from_args();
 
-
     match opt {
-        Opt::Encode { in_files, out_file, log_level} => {
+        // Encoding csv into binary
+        Opt::Encode { in_files, out_file, log_level, rows } => {
             loggerv::init_with_level(log_level).unwrap();
 
             if in_files.len() > 1 && out_file.len() > 0 {
                 error!("Outfile not supported when run with multiple input files!");
             } else if out_file.len() > 0 {
                 for in_file in in_files {
-                    encode(&in_file, &out_file);
+                    encode(&in_file, &out_file, rows);
                 }
             } else {
                 for in_file in in_files {
                     let mut out_file = in_file.clone();
                     out_file.push_str(".bin");
-                    encode(&in_file, &out_file);
+                    encode(&in_file, &out_file, rows);
                 }
             }
         },
 
-        Opt::Decode { in_files, out_file, template_file, log_level } => {
+        // Decoding binary into csv
+        Opt::Decode { in_files, out_file, template_file, log_level, rows } => {
             loggerv::init_with_level(log_level).unwrap();
 
             if in_files.len() > 1 && out_file.len() > 0 {
@@ -88,13 +91,13 @@ fn main() {
                 if let Some(templates) = Template::read_templates(&template_file) {
                     if out_file.len() > 0 {
                         for in_file in in_files {
-                            decode(&in_file, &out_file, &templates);
+                            decode(&in_file, &out_file, &templates, rows);
                         }
                     } else {
                         for in_file in in_files {
                             let mut out_file = in_file.clone();
                             out_file.push_str(".csv");
-                            decode(&in_file, &out_file, &templates);
+                            decode(&in_file, &out_file, &templates, rows);
                         }
                     }
                 } else {
