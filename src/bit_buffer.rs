@@ -36,127 +36,6 @@ impl Iterator for BitBuffer {
     }
 }
 
-#[test]
-pub fn test_bit_buffer_iter_be() {
-    let mut bit_buffer: BitBuffer = Default::default();
-
-    bit_buffer.push_byte_be(1);
-    bit_buffer.push_byte_be(2);
-    bit_buffer.push_byte_be(3);
-    bit_buffer.push_byte_be(4);
-
-    let bytes: [u8; 4] = [1, 2, 3, 4];
-
-    for i in 0..4 {
-        let byte = bit_buffer.next().unwrap();
-        assert!(bytes[i] == byte);
-    }
-
-    assert!(bit_buffer.next() == None);
-}
-
-#[test]
-pub fn test_bit_buffer_iter_le() {
-    let mut bit_buffer: BitBuffer = Default::default();
-
-    bit_buffer.push_byte_le(1);
-    bit_buffer.push_byte_le(2);
-    bit_buffer.push_byte_le(3);
-    bit_buffer.push_byte_le(4);
-
-    let bytes: [u8; 4] = [4, 3, 2, 1];
-
-    for i in 0..4 {
-        assert!(bytes[i] == bit_buffer.next().unwrap());
-    }
-
-    assert!(bit_buffer.next() == None);
-}
-
-#[test]
-pub fn test_bit_buffer_byte_aligned() {
-    let mut bit_buffer: BitBuffer = Default::default();
-
-    bit_buffer.bits_avail = 0;
-    assert!(bit_buffer.byte_aligned() == false);
-
-    bit_buffer.bits_avail = 1;
-    assert!(bit_buffer.byte_aligned() == false);
-
-    bit_buffer.bits_avail = 8;
-    assert!(bit_buffer.byte_aligned() == true);
-
-    bit_buffer.bits_avail = 16;
-    assert!(bit_buffer.byte_aligned() == true);
-
-    bit_buffer.bits_avail = 24;
-    assert!(bit_buffer.byte_aligned() == true);
-
-    bit_buffer.bits_avail = BITS_IN_BUFFER;
-    assert!(bit_buffer.byte_aligned() == true);
-
-    bit_buffer.bits_avail = 63;
-    assert!(bit_buffer.byte_aligned() == false);
-}
-
-#[test]
-pub fn test_bit_buffer_push_value_be() {
-    let mut bit_buffer: BitBuffer = BitBuffer::default();
-
-    bit_buffer.push_value(Value::Uint8(7),  3, Endianness::Big);
-    bit_buffer.push_value(Value::Int16(2),  4, Endianness::Big);
-    bit_buffer.push_value(Value::Uint16(1), 1, Endianness::Big);
-
-    assert!(bit_buffer.bits == 0xE5);
-}
-
-#[test]
-pub fn test_bit_buffer_push_value_le() {
-    let mut bit_buffer: BitBuffer = BitBuffer::default();
-
-    bit_buffer.push_value(Value::Uint8(1),  3, Endianness::Little);
-    bit_buffer.push_value(Value::Uint16(2), 4, Endianness::Little);
-    bit_buffer.push_value(Value::Uint16(1), 1, Endianness::Little);
-
-    assert!(bit_buffer.bits == 0x91);
-}
-
-#[test]
-pub fn test_bit_buffer_pull_value_be() {
-    let mut bit_buffer: BitBuffer = BitBuffer::default();
-
-    bit_buffer.push_value(Value::Uint8(7),  3, Endianness::Big);
-    bit_buffer.push_value(Value::Int16(2),  4, Endianness::Big);
-    bit_buffer.push_value(Value::Uint16(1), 1, Endianness::Big);
-
-    let typ = FieldType::Uint(3, Endianness::Big, BitSize::Bits8);
-    assert!(bit_buffer.pull_value(&typ).unwrap() == Value::Uint8(7));
-
-    let typ = FieldType::Int(4, Endianness::Big, BitSize::Bits16);
-    assert!(bit_buffer.pull_value(&typ).unwrap() == Value::Int8(2));
-
-    let typ = FieldType::Uint(1, Endianness::Big, BitSize::Bits16);
-    assert!(bit_buffer.pull_value(&typ).unwrap() == Value::Uint8(1));
-}
-
-#[test]
-pub fn test_bit_buffer_pull_value_le() {
-    let mut bit_buffer: BitBuffer = BitBuffer::default();
-
-    bit_buffer.push_value(Value::Uint8(7),  3, Endianness::Little);
-    bit_buffer.push_value(Value::Int16(2),  4, Endianness::Little);
-    bit_buffer.push_value(Value::Uint16(1), 1, Endianness::Little);
-
-    let typ = FieldType::Uint(3, Endianness::Little, BitSize::Bits8);
-    assert!(bit_buffer.pull_value(&typ).unwrap() == Value::Uint8(7));
-
-    let typ = FieldType::Int(4, Endianness::Little, BitSize::Bits16);
-    assert!(bit_buffer.pull_value(&typ).unwrap() == Value::Int8(2));
-
-    let typ = FieldType::Uint(1, Endianness::Little, BitSize::Bits16);
-    assert!(bit_buffer.pull_value(&typ).unwrap() == Value::Uint8(1));
-}
-
 impl BitBuffer {
     pub fn byte_aligned(&self) -> bool {
         (self.bits_avail > 0) && (self.bits_avail % 8 == 0)
@@ -350,3 +229,125 @@ impl BitBuffer {
         }
     }
 }
+
+#[test]
+pub fn test_bit_buffer_iter_be() {
+    let mut bit_buffer: BitBuffer = Default::default();
+
+    bit_buffer.push_byte_be(1);
+    bit_buffer.push_byte_be(2);
+    bit_buffer.push_byte_be(3);
+    bit_buffer.push_byte_be(4);
+
+    let bytes: [u8; 4] = [1, 2, 3, 4];
+
+    for i in 0..4 {
+        let byte = bit_buffer.next().unwrap();
+        assert!(bytes[i] == byte);
+    }
+
+    assert!(bit_buffer.next() == None);
+}
+
+#[test]
+pub fn test_bit_buffer_iter_le() {
+    let mut bit_buffer: BitBuffer = Default::default();
+
+    bit_buffer.push_byte_le(1);
+    bit_buffer.push_byte_le(2);
+    bit_buffer.push_byte_le(3);
+    bit_buffer.push_byte_le(4);
+
+    let bytes: [u8; 4] = [4, 3, 2, 1];
+
+    for i in 0..4 {
+        assert!(bytes[i] == bit_buffer.next().unwrap());
+    }
+
+    assert!(bit_buffer.next() == None);
+}
+
+#[test]
+pub fn test_bit_buffer_byte_aligned() {
+    let mut bit_buffer: BitBuffer = Default::default();
+
+    bit_buffer.bits_avail = 0;
+    assert!(bit_buffer.byte_aligned() == false);
+
+    bit_buffer.bits_avail = 1;
+    assert!(bit_buffer.byte_aligned() == false);
+
+    bit_buffer.bits_avail = 8;
+    assert!(bit_buffer.byte_aligned() == true);
+
+    bit_buffer.bits_avail = 16;
+    assert!(bit_buffer.byte_aligned() == true);
+
+    bit_buffer.bits_avail = 24;
+    assert!(bit_buffer.byte_aligned() == true);
+
+    bit_buffer.bits_avail = BITS_IN_BUFFER;
+    assert!(bit_buffer.byte_aligned() == true);
+
+    bit_buffer.bits_avail = 63;
+    assert!(bit_buffer.byte_aligned() == false);
+}
+
+#[test]
+pub fn test_bit_buffer_push_value_be() {
+    let mut bit_buffer: BitBuffer = BitBuffer::default();
+
+    bit_buffer.push_value(Value::Uint8(7),  3, Endianness::Big);
+    bit_buffer.push_value(Value::Int16(2),  4, Endianness::Big);
+    bit_buffer.push_value(Value::Uint16(1), 1, Endianness::Big);
+
+    assert!(bit_buffer.bits == 0xE5);
+}
+
+#[test]
+pub fn test_bit_buffer_push_value_le() {
+    let mut bit_buffer: BitBuffer = BitBuffer::default();
+
+    bit_buffer.push_value(Value::Uint8(1),  3, Endianness::Little);
+    bit_buffer.push_value(Value::Uint16(2), 4, Endianness::Little);
+    bit_buffer.push_value(Value::Uint16(1), 1, Endianness::Little);
+
+    assert!(bit_buffer.bits == 0x91);
+}
+
+#[test]
+pub fn test_bit_buffer_pull_value_be() {
+    let mut bit_buffer: BitBuffer = BitBuffer::default();
+
+    bit_buffer.push_value(Value::Uint8(7),  3, Endianness::Big);
+    bit_buffer.push_value(Value::Int16(2),  4, Endianness::Big);
+    bit_buffer.push_value(Value::Uint16(1), 1, Endianness::Big);
+
+    let typ = FieldType::Uint(3, Endianness::Big, BitSize::Bits8);
+    assert!(bit_buffer.pull_value(&typ).unwrap() == Value::Uint8(7));
+
+    let typ = FieldType::Int(4, Endianness::Big, BitSize::Bits16);
+    assert!(bit_buffer.pull_value(&typ).unwrap() == Value::Int8(2));
+
+    let typ = FieldType::Uint(1, Endianness::Big, BitSize::Bits16);
+    assert!(bit_buffer.pull_value(&typ).unwrap() == Value::Uint8(1));
+}
+
+#[test]
+pub fn test_bit_buffer_pull_value_le() {
+    let mut bit_buffer: BitBuffer = BitBuffer::default();
+
+    bit_buffer.push_value(Value::Uint8(7),  3, Endianness::Little);
+    bit_buffer.push_value(Value::Int16(2),  4, Endianness::Little);
+    bit_buffer.push_value(Value::Uint16(1), 1, Endianness::Little);
+
+    let typ = FieldType::Uint(3, Endianness::Little, BitSize::Bits8);
+    assert!(bit_buffer.pull_value(&typ).unwrap() == Value::Uint8(7));
+
+    let typ = FieldType::Int(4, Endianness::Little, BitSize::Bits16);
+    assert!(bit_buffer.pull_value(&typ).unwrap() == Value::Int8(2));
+
+    let typ = FieldType::Uint(1, Endianness::Little, BitSize::Bits16);
+    assert!(bit_buffer.pull_value(&typ).unwrap() == Value::Uint8(1));
+}
+

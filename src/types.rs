@@ -37,7 +37,6 @@ pub enum Signedness {
 /// A field type also carries information about the memory
 /// area that contains it. This is used for bitfields to indicate
 /// the size of the bit field that contains a particular set of bits.
-#[allow(non_camel_case_types)]
 #[derive(Eq, PartialEq, Debug, Copy, Clone, Deserialize)]
 pub enum FieldType {
     /// Signed integers

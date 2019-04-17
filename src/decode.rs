@@ -38,6 +38,48 @@ fn read_field<R>(reader: &mut R,
     })
 }
 
+fn write_field<W: Write>(writer: &mut W, field: &Field) {
+    writer.write_all(&field.to_record().as_bytes()).unwrap();
+}
+
+pub fn decode(in_file: &String, out_file: &String, templates: &Vec<Template>) -> Option<()> {
+    let input_file =
+        File::open(&in_file).expect(&format!("Could not open input file '{}'!", &in_file));
+    let mut input = BufReader::new(input_file);
+
+    let mut output_file =
+        File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
+
+
+    let template_bytes = templates.num_bits() / 8;
+    let mut cursor = Cursor::new(vec![0; template_bytes]);
+
+    // Decode binary data, writing out to csv file.
+    output_file.write_all(&"type,description,value\n".to_string().as_bytes()).unwrap();
+    while true {
+        let mut decoder_state = Default::default();
+
+        // if we get a read error, we are at the end of input, so just exit cleanly
+        if let Err(_) = input.read_exact(cursor.get_mut()) {
+            return None;
+        }
+
+        for template in templates.iter() {
+            let field = read_field(&mut cursor, &mut decoder_state, &template)?;
+
+            info!("{}", field);
+
+            write_field(&mut output_file, &field);
+
+            output_file.write_all(&b"\n"[..]).unwrap();
+        }
+    }
+
+    info!("Finished writing to {}", &out_file);
+
+    Some(())
+}
+
 #[test]
 fn test_read_field_be() {
     let mut buffer: Vec<u8> = vec!(1, 0, 2, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4);
@@ -193,47 +235,5 @@ fn test_read_field_le_bitfields_word() {
     assert_eq!(field, Some(Field { value: Value::Uint8(0x00),
                                    typ: FieldType::Uint(2, endianness, BitSize::Bits16),
                                    description: descr.clone() }));
-}
-
-fn write_field<W: Write>(writer: &mut W, field: &Field) {
-    writer.write_all(&field.to_record().as_bytes()).unwrap();
-}
-
-pub fn decode(in_file: &String, out_file: &String, templates: &Vec<Template>) -> Option<()> {
-    let input_file =
-        File::open(&in_file).expect(&format!("Could not open input file '{}'!", &in_file));
-    let mut input = BufReader::new(input_file);
-
-    let mut output_file =
-        File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
-
-
-    let template_bytes = templates.num_bits() / 8;
-    let mut cursor = Cursor::new(vec![0; template_bytes]);
-
-    // Decode binary data, writing out to csv file.
-    output_file.write_all(&"type,description,value\n".to_string().as_bytes()).unwrap();
-    while true {
-        let mut decoder_state = Default::default();
-
-        // if we get a read error, we are at the end of input, so just exit cleanly
-        if let Err(_) = input.read_exact(cursor.get_mut()) {
-            return None;
-        }
-
-        for template in templates.iter() {
-            let field = read_field(&mut cursor, &mut decoder_state, &template)?;
-
-            info!("{}", field);
-
-            write_field(&mut output_file, &field);
-
-            output_file.write_all(&b"\n"[..]).unwrap();
-        }
-    }
-
-    info!("Finished writing to {}", &out_file);
-
-    Some(())
 }
 
