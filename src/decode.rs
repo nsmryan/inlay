@@ -56,7 +56,7 @@ pub fn decode(in_file: &String, out_file: &String, templates: &Vec<Template>) ->
 
     // Decode binary data, writing out to csv file.
     output_file.write_all(&"type,description,value\n".to_string().as_bytes()).unwrap();
-    while true {
+    loop {
         let mut decoder_state = Default::default();
 
         // if we get a read error, we are at the end of input, so just exit cleanly
