@@ -76,7 +76,9 @@ fn main() {
                     let mut output = File::create(&out_file).expect(&format!("Cannto open output file {}!", out_file));
 
                     for in_file in in_files {
-                        encode(&in_file, &mut output, &templates, rows);
+                        if let None = encode(&in_file, &mut output, &templates, rows) {
+                            panic!("Encoding error!");
+                        }
                     }
                 } else {
                     for in_file in in_files {
@@ -84,7 +86,10 @@ fn main() {
                         out_file.push_str(".bin");
                         let mut output =
                             File::create(&out_file).expect(&format!("Cannto open output file {}!", out_file));
-                        encode(&in_file, &mut output, &templates, rows);
+
+                        if let None = encode(&in_file, &mut output, &templates, rows) {
+                            panic!("Encoding error!");
+                        }
                     }
                 }
             } else {
@@ -106,7 +111,9 @@ fn main() {
                             File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
 
                         for in_file in in_files {
-                            decode(&in_file, &mut output_file, &templates, rows);
+                            if let None = decode(&in_file, &mut output_file, &templates, rows) {
+                                panic!("Error decoding!");
+                            }
                         }
                     } else {
                         for in_file in in_files {
@@ -116,7 +123,9 @@ fn main() {
                             let mut output_file =
                                 File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
 
-                            decode(&in_file, &mut output_file, &templates, rows);
+                            if let None = decode(&in_file, &mut output_file, &templates, rows) {
+                                panic!("Error decoding!");
+                            }
                         }
                     }
                 } else {

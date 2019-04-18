@@ -28,16 +28,17 @@ pub fn decode<W: Write>(in_file: &String, output_file: &mut W, templates: &Vec<T
     loop {
         let mut decoder_state = Default::default();
 
+        cursor.set_position(0);
+
         // if we get a read error, we are at the end of input, so just exit cleanly
         if let Err(_) = input.read_exact(cursor.get_mut()) {
-            return None;
+            dbg!("Finished Reading File");
+            return Some(());
         }
 
         for index in 0..templates.len() {
             let template = &templates[index];
-            let field = read_field(&mut cursor, &mut decoder_state, &template)?;
-
-            info!("{}", field);
+            let field = read_field(&mut cursor, &mut decoder_state, &template).expect(&format!("Could not read field {}", template.description));
 
             // for rows, write out type, description, value
             if rows {

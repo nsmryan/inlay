@@ -8,7 +8,7 @@ use crate::bit_buffer::*;
 use crate::template::*;
 
 
-pub fn encode<W: Write>(in_file: &String, output_file: &mut W, template: &Vec<Template>, rows: bool) -> Option<()> {
+pub fn encode<W: Write>(in_file: &String, output_file: &mut W, templates: &Vec<Template>, rows: bool) -> Option<()> {
     let file = File::open(&in_file).or_else(|err| { error!("Could not open input file '{}'!", &in_file);
                                                     Err(err)
                                                    }).ok().unwrap();
@@ -40,7 +40,7 @@ pub fn encode<W: Write>(in_file: &String, output_file: &mut W, template: &Vec<Te
         for record in lines.records() {
             let rec = record.ok()?;
 
-            for (template, value_str) in record.zip(templates) {
+            for (value_str, template) in rec.iter().zip(templates) {
                 let field = to_field(template.typ, value_str, template.description.clone());
                 info!("{}", field);
 
