@@ -20,11 +20,11 @@ pub fn encode<W: Write>(in_file: &String, output_file: &mut W, template: &Vec<Te
     let mut bit_buffer: BitBuffer = Default::default();
 
 
-    for record in lines.records() {
-        let rec = record.ok()?;
+    // if processing rows, each row contains a field
+    if rows {
+        for record in lines.records() {
+            let rec = record.ok()?;
 
-        // if processing rows, each row contains a field
-        if rows {
             let type_str = &rec[0];
             let description = &rec[1];
             let value_str = &rec[2];
@@ -35,7 +35,17 @@ pub fn encode<W: Write>(in_file: &String, output_file: &mut W, template: &Vec<Te
             info!("{}", field);
 
             write_out(output_file, &field, &mut bit_buffer);
-        } else { // if processing columns, each row contains a list of fields
+        }
+    } else { // if processing columns, each row contains all items in the template
+        for record in lines.records() {
+            let rec = record.ok()?;
+
+            for (template, value_str) in record.zip(templates) {
+                let field = to_field(template.typ, value_str, template.description.clone());
+                info!("{}", field);
+
+                write_out(output_file, &field, &mut bit_buffer);
+            }
         }
     }
 
