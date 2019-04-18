@@ -1,12 +1,14 @@
 use std::fs::File;
+use std::io::{Write};
 
 use byteorder::WriteBytesExt;
 
 use crate::types::*;
 use crate::bit_buffer::*;
+use crate::template::*;
 
 
-pub fn encode(in_file: &String, out_file: &String, rows: bool) -> Option<()> {
+pub fn encode<W: Write>(in_file: &String, output_file: &mut W, template: &Vec<Template>, rows: bool) -> Option<()> {
     let file = File::open(&in_file).or_else(|err| { error!("Could not open input file '{}'!", &in_file);
                                                     Err(err)
                                                    }).ok().unwrap();
@@ -14,8 +16,6 @@ pub fn encode(in_file: &String, out_file: &String, rows: bool) -> Option<()> {
     info!("Opened {}", &in_file);
 
     let mut lines = csv::Reader::from_reader(file);
-
-    let mut output = File::create(&out_file).ok()?;
 
     let mut bit_buffer: BitBuffer = Default::default();
 
@@ -34,12 +34,10 @@ pub fn encode(in_file: &String, out_file: &String, rows: bool) -> Option<()> {
             let field = to_field(typ, value_str, description.to_string());
             info!("{}", field);
 
-            write_out(&mut output, &field, &mut bit_buffer);
+            write_out(output_file, &field, &mut bit_buffer);
         } else { // if processing columns, each row contains a list of fields
         }
     }
-
-    info!("Finished writing to {}", &out_file);
 
     Some(())
 }

@@ -14,6 +14,8 @@ mod encode;
 mod decode;
 mod template;
 
+use std::fs::File;
+
 use structopt::StructOpt;
 
 use log::{Level};
@@ -28,6 +30,8 @@ use template::*;
 enum Opt {
     #[structopt(name="encode")]
     Encode {
+        template_file: String,
+
         in_files: Vec<String>,
 
         #[structopt(short="o", long="output", default_value="")]
@@ -42,13 +46,12 @@ enum Opt {
 
      #[structopt(name="decode")]
      Decode {
+        template_file: String,
+
         in_files: Vec<String>,
 
         #[structopt(short="o", long="output", default_value="")]
         out_file: String,
-
-        #[structopt(short="t", long="template")]
-        template_file: String,
 
         #[structopt(short="l", long="log-level", default_value="error")]
         log_level: Level,
@@ -63,26 +66,34 @@ fn main() {
 
     match opt {
         // Encoding csv into binary
-        Opt::Encode { in_files, out_file, log_level, rows } => {
+        Opt::Encode { template_file, in_files, out_file, log_level, rows } => {
             loggerv::init_with_level(log_level).unwrap();
 
-            if in_files.len() > 1 && out_file.len() > 0 {
-                error!("Outfile not supported when run with multiple input files!");
-            } else if out_file.len() > 0 {
-                for in_file in in_files {
-                    encode(&in_file, &out_file, rows);
+            if let Some(templates) = Template::read_templates(&template_file) {
+                if in_files.len() > 1 && out_file.len() > 0 {
+                    error!("Outfile not supported when run with multiple input files!");
+                } else if out_file.len() > 0 {
+                    let mut output = File::create(&out_file).expect(&format!("Cannto open output file {}!", out_file));
+
+                    for in_file in in_files {
+                        encode(&in_file, &mut output, &templates, rows);
+                    }
+                } else {
+                    for in_file in in_files {
+                        let mut out_file = in_file.clone();
+                        out_file.push_str(".bin");
+                        let mut output =
+                            File::create(&out_file).expect(&format!("Cannto open output file {}!", out_file));
+                        encode(&in_file, &mut output, &templates, rows);
+                    }
                 }
             } else {
-                for in_file in in_files {
-                    let mut out_file = in_file.clone();
-                    out_file.push_str(".bin");
-                    encode(&in_file, &out_file, rows);
-                }
+                panic!("Could not parse template file!");
             }
         },
 
         // Decoding binary into csv
-        Opt::Decode { in_files, out_file, template_file, log_level, rows } => {
+        Opt::Decode { template_file, in_files, out_file, log_level, rows } => {
             loggerv::init_with_level(log_level).unwrap();
 
             if in_files.len() > 1 && out_file.len() > 0 {
@@ -90,14 +101,22 @@ fn main() {
             } else {
                 if let Some(templates) = Template::read_templates(&template_file) {
                     if out_file.len() > 0 {
+
+                        let mut output_file =
+                            File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
+
                         for in_file in in_files {
-                            decode(&in_file, &out_file, &templates, rows);
+                            decode(&in_file, &mut output_file, &templates, rows);
                         }
                     } else {
                         for in_file in in_files {
                             let mut out_file = in_file.clone();
                             out_file.push_str(".csv");
-                            decode(&in_file, &out_file, &templates, rows);
+
+                            let mut output_file =
+                                File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
+
+                            decode(&in_file, &mut output_file, &templates, rows);
                         }
                     }
                 } else {

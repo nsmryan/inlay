@@ -1,8 +1,5 @@
 use std::fs::File;
-use std::io::BufReader;
-use std::io::Write;
-use std::io::Cursor;
-use std::io::Read;
+use std::io::{Write, Read, Cursor, BufReader};
 
 use byteorder::ReadBytesExt;
 
@@ -11,14 +8,10 @@ use crate::template::*;
 use crate::bit_buffer::*;
 
 
-pub fn decode(in_file: &String, out_file: &String, templates: &Vec<Template>, rows: bool) -> Option<()> {
+pub fn decode<W: Write>(in_file: &String, output_file: &mut W, templates: &Vec<Template>, rows: bool) -> Option<()> {
     let input_file =
         File::open(&in_file).expect(&format!("Could not open input file '{}'!", &in_file));
     let mut input = BufReader::new(input_file);
-
-    let mut output_file =
-        File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
-
 
     let template_bytes = templates.num_bits() / 8;
     let mut cursor = Cursor::new(vec![0; template_bytes]);
@@ -48,7 +41,7 @@ pub fn decode(in_file: &String, out_file: &String, templates: &Vec<Template>, ro
 
             // for rows, write out type, description, value
             if rows {
-                write_field(&mut output_file, &field);
+                write_field(output_file, &field);
                 output_file.write_all(&b"\n"[..]).unwrap();
             } else {
                 // for columns, write out value
@@ -65,8 +58,6 @@ pub fn decode(in_file: &String, out_file: &String, templates: &Vec<Template>, ro
             output_file.write_all(&b"\n"[..]).unwrap();
         }
     }
-
-    info!("Finished writing to {}", &out_file);
 
     Some(())
 }

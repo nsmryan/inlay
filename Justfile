@@ -18,8 +18,8 @@ retest:
   cargo watch -x test
 
 encode:
-  cargo run -- encode test.csv -o data.bin
+  cargo run -- encode test.csv data.bin
 
 decode:
-  cargo run -- decode data.bin -t test.csv
+  cargo run -- decode test.csv data.bin
 

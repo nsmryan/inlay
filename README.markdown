@@ -1,4 +1,5 @@
-#Inlay
+Inlay
+=====
 
 This program provides a very simple translation from binary data to csv, and csv
 to binary data. It is intended for working with simple binary formats, and especially
@@ -37,8 +38,38 @@ a "values" column it will be ignored. This allows a csv file from decoding to be
 template when decoding other instances of a binary structure.
 
 
-When decoding, a file many have many entries. The command line options allow repetitions
-of a certain number of repeated structures, or as many as necessary to read the whole file.
-Structopt seems to require the flag "-r=-1" rather then "-r -1" when specifying negative
-numbers.
+## Usage
+### Encode 
+Encode a single file into a binary file, row format:
+  * inlay encode template.csv 
+  * inlay encode template.csv -o data.bin
 
+Encode a column csv file into a binary file:
+  * inlay encode template.csv data.csv
+  * inlay encode template.csv data.csv -o data.bin
+
+Encode multiple input files into their own binary files:
+  * inlay encode template.csv data.csv
+  * inlay encode template.csv data.csv data2.csv data3.csv
+
+Encode multiple input files into a single binary file:
+  * inlay encode template.csv data.csv
+  * inlay encode template.csv data.csv data2.csv data3.csv -o data.bin
+
+Decode a single binary file, row format:
+  * inlay decode template.csv data.bin -r
+
+Decode a single binary file, col format:
+  * inlay decode template.csv data.bin
+
+Decode multiple binary files, row format:
+  * inlay decode template.csv data.bin data2.bin data3.bin -r
+
+Decode multiple binary files, col format:
+  * inlay decode template.csv data.bin data2.bin data3.bin -r
+
+Decode multiple binary files into a single file, row format:
+  * inlay decode template.csv data.bin data2.bin data3.bin -r -o output.csv
+
+Decode multiple binary files into a single file, col format:
+  * inlay decode template.csv data.bin data2.bin data3.bin -o output.csv
