@@ -8,15 +8,12 @@ use crate::template::*;
 use crate::bit_buffer::*;
 
 
-pub fn decode<W: Write>(in_file: &String, output_file: &mut W, templates: &Vec<Template>, rows: bool) -> Option<()> {
-    let input_file =
-        File::open(&in_file).expect(&format!("Could not open input file '{}'!", &in_file));
-    let mut input = BufReader::new(input_file);
-
+pub fn decode<R: Read, W: Write>(input: &mut R, output_file: &mut W, templates: &Vec<Template>, rows: bool) -> Option<()> {
     let template_bytes = templates.num_bits() / 8;
     let mut cursor = Cursor::new(vec![0; template_bytes]);
 
     // Decode binary data, writing out to csv file.
+    info!("Starting decoding");
     if rows {
         output_file.write_all(&"type,description,value\n".to_string().as_bytes()).unwrap();
     } else { // columns
@@ -59,8 +56,6 @@ pub fn decode<W: Write>(in_file: &String, output_file: &mut W, templates: &Vec<T
             output_file.write_all(&b"\n"[..]).unwrap();
         }
     }
-
-    Some(())
 }
 
 fn read_field<R>(reader: &mut R,

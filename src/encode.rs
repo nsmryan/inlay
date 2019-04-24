@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{Write};
+use std::io::{Write, Read};
 
 use byteorder::WriteBytesExt;
 
@@ -8,21 +8,26 @@ use crate::bit_buffer::*;
 use crate::template::*;
 
 
-pub fn encode<W: Write>(in_file: &String, output_file: &mut W, templates: &Vec<Template>, rows: bool) -> Option<()> {
-    let file = File::open(&in_file).or_else(|err| { error!("Could not open input file '{}'!", &in_file);
-                                                    Err(err)
-                                                   }).ok().unwrap();
-
-    info!("Opened {}", &in_file);
-
-    let mut lines = csv::Reader::from_reader(file);
+pub fn encode<R: Read, W: Write>(input: &mut R, output: &mut W, templates: &Vec<Template>, rows: bool) -> Option<()> {
+    let mut lines = csv::Reader::from_reader(input);
 
     let mut bit_buffer: BitBuffer = Default::default();
 
-
     // if processing rows, each row contains a field
+    trace!("Starting encoding");
     if rows {
+        trace!("Row based");
+        let headers: Vec<&str> =
+            lines.headers().expect("Expected template file to have a csv file header").iter().collect();
+
+        let required_fields = vec!("value", "description", "typ");
+        if !required_fields.iter().all(|field_name| headers.contains(&field_name)) {
+            panic!("A row based csv file must at least have a field for value, description and type!");
+        }
+
         for record in lines.records() {
+            trace!("Processing record");
+
             let rec = record.ok()?;
 
             let type_str = &rec[0];
@@ -31,20 +36,31 @@ pub fn encode<W: Write>(in_file: &String, output_file: &mut W, templates: &Vec<T
 
             let typ = type_str.parse().ok()?;
 
-            let field = to_field(typ, value_str, description.to_string());
-            info!("{}", field);
+            let field = Field { value: to_value(typ, value_str),
+                                typ: typ,
+                                description: description.to_string(),
+            };
+            trace!("{}", field);
 
-            write_out(output_file, &field, &mut bit_buffer);
+            write_out(output, &field, &mut bit_buffer);
         }
     } else { // if processing columns, each row contains all items in the template
+        trace!("Column based");
         for record in lines.records() {
+            trace!("Processing record");
+
             let rec = record.ok()?;
 
             for (value_str, template) in rec.iter().zip(templates) {
-                let field = to_field(template.typ, value_str, template.description.clone());
-                info!("{}", field);
+                trace!("Processing field");
 
-                write_out(output_file, &field, &mut bit_buffer);
+                let field = Field { value: to_value(template.typ, value_str),
+                                    typ: template.typ,
+                                    description: template.description.clone(),
+                };
+                trace!("{}", field);
+
+                write_out(output, &field, &mut bit_buffer);
             }
         }
     }
@@ -53,6 +69,8 @@ pub fn encode<W: Write>(in_file: &String, output_file: &mut W, templates: &Vec<T
 }
 
 fn to_value(typ: FieldType, value_str: &str) -> Value {
+  let value_str = value_str.trim();
+
   match typ {
     FieldType::Int(num_bits, _, _) => {
         if num_bits <= 8 {
@@ -93,9 +111,8 @@ fn to_value(typ: FieldType, value_str: &str) -> Value {
 }
 
 fn to_field(typ: FieldType, value_str: &str, description: String) -> Field {
-    let value = to_value(typ, value_str);
     Field {
-        value: value,
+        value: to_value(typ, value_str),
         typ: typ,
         description: description,
     }
