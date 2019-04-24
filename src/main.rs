@@ -43,7 +43,7 @@ enum Opt {
         #[structopt(short="l", long="log-level", default_value="error")]
         log_level: Level,
 
-        #[structopt(short="r", long="rows")]
+        #[structopt(short="r", long="rows", help="Encode row based file")]
         rows: bool,
      },
 
@@ -59,7 +59,7 @@ enum Opt {
         #[structopt(short="l", long="log-level", default_value="error")]
         log_level: Level,
 
-        #[structopt(short="r", long="rows")]
+        #[structopt(short="r", long="rows", help="Decode row based file")]
         rows: bool,
      },
 }

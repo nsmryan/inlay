@@ -4,6 +4,66 @@ This program provides a very simple translation from binary data to csv, and csv
 to binary data. It is intended for working with simple, fixed size binary formats, and especially
 for initial testing and development while there may not be tools specific to the format.
 
+## Usage
+inlay 0.1.0
+nsmryan <nsmryan@gmail.com>
+A command line tool for quickly reading and writing simple binary formats
+
+USAGE:
+    inlay.exe <SUBCOMMAND>
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+SUBCOMMANDS:
+    decode
+    encode
+    help      Prints this message or the help of the given subcommand(s)
+
+### Decoding
+USAGE:
+    inlay.exe decode [FLAGS] [OPTIONS] <template_file> [in_file_globs]...
+
+FLAGS:
+    -h, --help       Prints help information
+    -r, --rows       Decode row based file
+    -V, --version    Prints version information
+
+OPTIONS:
+    -l, --log-level <log_level>     [default: error]
+    -o, --output <out_file>         [default: ]
+
+ARGS:
+    <template_file>
+    <in_file_globs>...
+
+### Encoding
+USAGE:
+    inlay.exe encode [FLAGS] [OPTIONS] <template_file> [in_file_globs]...
+
+FLAGS:
+    -h, --help       Prints help information
+    -r, --rows       Encode row based file
+    -V, --version    Prints version information
+
+OPTIONS:
+    -l, --log-level <log_level>     [default: error]
+    -o, --output <out_file>         [default: ]
+
+ARGS:
+    <template_file>
+    <in_file_globs>...
+
+## Installation
+The 'inlay' tool can be installed with cargo using the command:
+```bash
+cargo install inlay
+```
+
+
+There are also [releases available]( https://github.com/nsmryan/inlay/releases).
+
 ## Template Files
 The 'inlay' program makes use a template files, which are just csv files with a name and type for fields.
 These files are intended to be simple to write or generate, containing a simple format specifier described below,
@@ -88,7 +148,7 @@ a "values" column it will be ignored. This allows a csv file from decoding to be
 template when decoding other instances of a binary structure.
 
 
-## Usage
+## Variations in Use 
 There are several ways to run the 'inlay' tool. The main way is to either encode or decode a 
 series of records, such as decoding a binary file containing one or more record, or encoding
 a csv file containing a record of data for each line.
