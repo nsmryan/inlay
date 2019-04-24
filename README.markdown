@@ -5,6 +5,7 @@ to binary data. It is intended for working with simple, fixed size binary format
 for initial testing and development while there may not be tools specific to the format.
 
 ## Usage
+```bash
 inlay 0.1.0
 nsmryan <nsmryan@gmail.com>
 A command line tool for quickly reading and writing simple binary formats
@@ -20,8 +21,10 @@ SUBCOMMANDS:
     decode
     encode
     help      Prints this message or the help of the given subcommand(s)
+```
 
 ### Decoding
+```bash
 USAGE:
     inlay.exe decode [FLAGS] [OPTIONS] <template_file> [in_file_globs]...
 
@@ -37,8 +40,10 @@ OPTIONS:
 ARGS:
     <template_file>
     <in_file_globs>...
+```
 
 ### Encoding
+```bash
 USAGE:
     inlay.exe encode [FLAGS] [OPTIONS] <template_file> [in_file_globs]...
 
@@ -54,6 +59,7 @@ OPTIONS:
 ARGS:
     <template_file>
     <in_file_globs>...
+```
 
 ## Installation
 The 'inlay' tool can be installed with cargo using the command:
