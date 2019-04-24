@@ -20,7 +20,7 @@ pub fn encode<R: Read, W: Write>(input: &mut R, output: &mut W, templates: &Vec<
         let headers: Vec<&str> =
             lines.headers().expect("Expected template file to have a csv file header").iter().collect();
 
-        let required_fields = vec!("value", "description", "typ");
+        let required_fields = vec!("value", "description", "type");
         if !required_fields.iter().all(|field_name| headers.contains(&field_name)) {
             panic!("A row based csv file must at least have a field for value, description and type!");
         }

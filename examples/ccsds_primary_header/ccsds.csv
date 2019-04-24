@@ -1,0 +1,8 @@
+typ,description
+uint11_be:16, apid
+uint1_be:16, secHeaderFlag
+uint1_be:16, type
+uint3_be:16, version
+uint14_be:16, seqCount
+uint2_be:16, seqFlag
+uint16_be, packetLen
