@@ -1,4 +1,4 @@
-typ,description
+type,description
 uint11_be:16, apid
 uint1_be:16, secHeaderFlag
 uint1_be:16, type
