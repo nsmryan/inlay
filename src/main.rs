@@ -15,7 +15,7 @@ mod decode;
 mod template;
 
 use std::fs::File;
-use std::io::{Write, Read, Cursor, BufReader};
+use std::io::{Write, Read, Cursor, BufReader, BufWriter};
 
 use structopt::StructOpt;
 
@@ -184,6 +184,7 @@ fn main() {
 
                         let mut output_file =
                             File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
+                        let mut output_file = BufWriter::new(output_file);
 
                         trace!("{} input files to process", in_files.len());
                         for in_file in in_files {
@@ -211,6 +212,7 @@ fn main() {
 
                             let mut output_file =
                                 File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
+                            let mut output_file = BufWriter::new(output_file);
                             trace!("Output file open");
 
                             let input_file =

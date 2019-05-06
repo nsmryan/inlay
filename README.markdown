@@ -6,7 +6,7 @@ for initial testing and development while there may not be tools specific to the
 
 ## Usage
 ```bash
-inlay 0.1.0
+inlay 0.2.2
 nsmryan <nsmryan@gmail.com>
 A command line tool for quickly reading and writing simple binary formats
 
@@ -195,3 +195,6 @@ Decode multiple binary files into a single file, row format:
 
 Decode multiple binary files into a single file, col format:
   * inlay decode template.csv data.bin data2.bin data3.bin -o output.csv
+
+# License
+Inlay is licensed under either MIT or APACHE2, whichever you prefer.
