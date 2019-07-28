@@ -54,7 +54,8 @@ impl Template {
         let mut lines = csv::Reader::from_reader(&template);
         info!("Opened Template File {}", &template_file);
 
-        let mut line_number: usize = 0;
+        // line number, assuming header
+        let mut line_number: usize = 2;
 
         // Decode template from input file.
         for record in lines.records() {
