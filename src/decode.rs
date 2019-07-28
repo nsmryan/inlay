@@ -18,7 +18,7 @@ pub fn decode<R: Read, W: Write>(input: &mut R, output_file: &mut W, templates: 
         output_file.write_all(&"type,description,value\n".to_string().as_bytes()).unwrap();
     } else { // columns
         let descriptions = templates.iter().map(|template| template.description.clone()).collect::<Vec<String>>();
-        let header_line = descriptions.join(", ");
+        let header_line = descriptions.join(",");
         output_file.write_all(header_line.as_bytes()).unwrap();
         output_file.write_all(&b"\n"[..]).unwrap();
     }
@@ -47,7 +47,7 @@ pub fn decode<R: Read, W: Write>(input: &mut R, output_file: &mut W, templates: 
 
                 // only write a ',' if this is not the last entry
                 if index != templates.len() - 1 {
-                    output_file.write_all(&b", "[..]).unwrap();
+                    output_file.write_all(&b","[..]).unwrap();
                 }
             }
         }

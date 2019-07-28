@@ -1,5 +1,5 @@
 type,description,value
-uint3_be:16,test1,1
+uint3_be:16,       test1,1
 uint1_be:16,test2,1
 uint4_be:16,test3,1
 uint8_be:16,test3,3

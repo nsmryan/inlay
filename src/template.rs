@@ -61,7 +61,7 @@ impl Template {
         for record in lines.records() {
             let rec = record.map_err(|_| TemplateError::RecordError(line_number))?;
             let typ = FieldType::from_str(&rec[0]).map_err(|_| TemplateError::LineNumber(line_number))?;
-            let desc = rec[1].to_string();
+            let desc = rec[1].to_string().trim().to_string();
 
             let template: Template =
                 Template {
