@@ -23,7 +23,7 @@ impl HasNumBits for Template {
 #[derive(Eq, PartialEq, Debug, Clone, Deserialize, Serialize)]
 pub enum TemplateError {
     LineNumber(usize),
-    RecordError,
+    RecordError(usize),
 }
 
 impl fmt::Display for TemplateError {
@@ -33,8 +33,8 @@ impl fmt::Display for TemplateError {
                 write!(f, "Error parsing template line {}", line_number)
             }
 
-            TemplateError::RecordError => {
-                write!(f, "Error reading record")
+            TemplateError::RecordError(line_number) => {
+                write!(f, "Error reading record on line {}", line_number)
             }
         }
     }
@@ -59,7 +59,7 @@ impl Template {
 
         // Decode template from input file.
         for record in lines.records() {
-            let rec = record.map_err(|_| TemplateError::RecordError)?;
+            let rec = record.map_err(|_| TemplateError::RecordError(line_number))?;
             let typ = FieldType::from_str(&rec[0]).map_err(|_| TemplateError::LineNumber(line_number))?;
             let desc = rec[1].to_string();
 
