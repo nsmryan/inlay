@@ -102,57 +102,62 @@ fn main() {
             }
 
             // open template file
-            if let Some(templates) = Template::read_templates(&template_file) {
-                trace!("Template file open");
-                // if input files were provided, and an output file was given
-                if input_files_given > 1 && out_file.len() > 0 {
-                    error!("Outfile not supported when run with multiple input files!");
-                } else if out_file.len() > 0 { // otherwise, if an output file was given
-                    trace!("Single output file {}", out_file);
-                    let mut output = File::create(&out_file).expect(&format!("Cannot open output file {}!", out_file));
-                    trace!("Output file open");
+            let template_result = Template::read_templates(&template_file);
+            match template_result {
+                Ok(templates) => {
+                    trace!("Template file open");
+                    // if input files were provided, and an output file was given
+                    if input_files_given > 1 && out_file.len() > 0 {
+                        error!("Outfile not supported when run with multiple input files!");
+                    } else if out_file.len() > 0 { // otherwise, if an output file was given
+                        trace!("Single output file {}", out_file);
+                        let mut output = File::create(&out_file).expect(&format!("Cannot open output file {}!", out_file));
+                        trace!("Output file open");
 
-                    trace!("{} input files to process", in_files.len());
-                    for in_file in in_files {
-                        trace!("Processing input file {}", in_file);
+                        trace!("{} input files to process", in_files.len());
+                        for in_file in in_files {
+                            trace!("Processing input file {}", in_file);
 
-                        let mut input = File::open(&in_file)
-                                              .or_else(|err| { error!("Could not open input file '{}'!", &in_file);
-                                                                        Err(err)
-                                                                       }).ok().unwrap();
-                        if let None = encode(&mut input, &mut output, &templates, rows) {
-                            panic!("Encoding error!");
-                        } else {
-                            trace!("File processed");
+                            let mut input = File::open(&in_file)
+                                                  .or_else(|err| { error!("Could not open input file '{}'!", &in_file);
+                                                                            Err(err)
+                                                                           }).ok().unwrap();
+                            if let None = encode(&mut input, &mut output, &templates, rows) {
+                                panic!("Encoding error!");
+                            } else {
+                                trace!("File processed");
+                            }
                         }
-                    }
-                } else { // otherwise create output file name from input file names
-                    trace!("Multiple output files");
+                    } else { // otherwise create output file name from input file names
+                        trace!("Multiple output files");
 
-                    trace!("{} input files to process", in_files.len());
-                    for in_file in in_files {
-                        let mut out_file = in_file.clone();
-                        out_file.push_str(".bin");
-                        info!("Outputting to {}", out_file);
+                        trace!("{} input files to process", in_files.len());
+                        for in_file in in_files {
+                            let mut out_file = in_file.clone();
+                            out_file.push_str(".bin");
+                            info!("Outputting to {}", out_file);
 
-                        info!("Processing input file {}", in_file);
+                            info!("Processing input file {}", in_file);
 
-                        let mut output =
-                            File::create(&out_file).expect(&format!("Cannot open output file {}!", out_file));
+                            let mut output =
+                                File::create(&out_file).expect(&format!("Cannot open output file {}!", out_file));
 
-                        let mut input = File::open(&in_file).or_else(|err| { error!("Could not open input file '{}'!", &in_file);
-                                                                        Err(err)
-                                                                       }).ok().unwrap();
+                            let mut input = File::open(&in_file).or_else(|err| { error!("Could not open input file '{}'!", &in_file);
+                                                                            Err(err)
+                                                                           }).ok().unwrap();
 
-                        if let None = encode(&mut input, &mut output, &templates, rows) {
-                            panic!("Encoding error!");
-                        } else {
-                            trace!("File processed");
+                            if let None = encode(&mut input, &mut output, &templates, rows) {
+                                panic!("Encoding error!");
+                            } else {
+                                trace!("File processed");
+                            }
                         }
                     }
                 }
-            } else {
-                panic!("Could not parse template file!");
+
+                Err(template_err) => {
+                    panic!("Could not parse template file {}!", template_err);
+                }
             }
         },
 
@@ -174,61 +179,66 @@ fn main() {
             } else {
                  trace!("Opening template file");
                 // open template file
-                if let Some(templates) = Template::read_templates(&template_file) {
-                     trace!("Template file opened");
+                let template_result = Template::read_templates(&template_file);
+                match template_result {
+                    Ok(templates) => {
+                         trace!("Template file opened");
 
-                    // if an output file was provided, write all output to that file.
-                    if out_file.len() > 0 {
-                        trace!("Single output file");
-                        info!("Outputting to {}", out_file);
-
-                        let mut output_file =
-                            File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
-                        let mut output_file = BufWriter::new(output_file);
-
-                        trace!("{} input files to process", in_files.len());
-                        for in_file in in_files {
-                            info!("Processing input file {}", in_file);
-                            let input_file =
-                                File::open(&in_file).expect(&format!("Could not open input file '{}'!", &in_file));
-                            let mut input = BufReader::new(input_file);
-
-                            if let None = decode(&mut input, &mut output_file, &templates, rows) {
-                                panic!("Error decoding!");
-                            } else {
-                                trace!("File processed");
-                            }
-                        }
-                    } else { // otherwise construct an output file for each input file.
-                        trace!("Multiple output files");
-
-                        trace!("{} input files to process", in_files.len());
-                        for in_file in in_files {
-                            trace!("Processing input file {}", in_file);
-
-                            let mut out_file = in_file.clone();
-                            out_file.push_str(".csv");
-                            trace!("Outputting to {}", out_file);
+                        // if an output file was provided, write all output to that file.
+                        if out_file.len() > 0 {
+                            trace!("Single output file");
+                            info!("Outputting to {}", out_file);
 
                             let mut output_file =
                                 File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
                             let mut output_file = BufWriter::new(output_file);
-                            trace!("Output file open");
 
-                            let input_file =
-                                File::open(&in_file).expect(&format!("Could not open input file '{}'!", &in_file));
-                            let mut input = BufReader::new(input_file);
-                            trace!("Input file open");
+                            trace!("{} input files to process", in_files.len());
+                            for in_file in in_files {
+                                info!("Processing input file {}", in_file);
+                                let input_file =
+                                    File::open(&in_file).expect(&format!("Could not open input file '{}'!", &in_file));
+                                let mut input = BufReader::new(input_file);
 
-                            if let None = decode(&mut input, &mut output_file, &templates, rows) {
-                                panic!("Error decoding!");
-                            } else {
-                                trace!("File processed");
+                                if let None = decode(&mut input, &mut output_file, &templates, rows) {
+                                    panic!("Error decoding!");
+                                } else {
+                                    trace!("File processed");
+                                }
+                            }
+                        } else { // otherwise construct an output file for each input file.
+                            trace!("Multiple output files");
+
+                            trace!("{} input files to process", in_files.len());
+                            for in_file in in_files {
+                                trace!("Processing input file {}", in_file);
+
+                                let mut out_file = in_file.clone();
+                                out_file.push_str(".csv");
+                                trace!("Outputting to {}", out_file);
+
+                                let mut output_file =
+                                    File::create(&out_file).expect(&format!("Could not open output file '{}'!", &out_file));
+                                let mut output_file = BufWriter::new(output_file);
+                                trace!("Output file open");
+
+                                let input_file =
+                                    File::open(&in_file).expect(&format!("Could not open input file '{}'!", &in_file));
+                                let mut input = BufReader::new(input_file);
+                                trace!("Input file open");
+
+                                if let None = decode(&mut input, &mut output_file, &templates, rows) {
+                                    panic!("Error decoding!");
+                                } else {
+                                    trace!("File processed");
+                                }
                             }
                         }
                     }
-                } else {
-                    panic!("Could not parse template file!");
+
+                    Err(template_err) => {
+                        panic!("Could not parse template file {}!", template_err);
+                    }
                 }
             }
         },
