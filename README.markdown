@@ -6,7 +6,7 @@ for initial testing and development while there may not be tools specific to the
 
 ## Usage
 ```bash
-inlay 0.3.0
+inlay 0.3.2
 nsmryan <nsmryan@gmail.com>
 A command line tool for quickly reading and writing simple binary formats
 
