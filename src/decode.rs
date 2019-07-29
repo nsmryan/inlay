@@ -3,6 +3,9 @@ use std::io::{Write, Read, Cursor, BufReader};
 
 use byteorder::ReadBytesExt;
 
+#[cfg(test)]
+use assert_approx_eq::assert_approx_eq;
+
 use crate::types::*;
 use crate::template::*;
 use crate::bit_buffer::*;
@@ -110,10 +113,109 @@ fn test_read_field_be() {
 
     let mut bit_buffer = Default::default();
 
-    assert!(read_field(&mut cursor, &mut bit_buffer, &byte) == Some(field1));
-    assert!(read_field(&mut cursor, &mut bit_buffer, &word) == Some(field2));
-    assert!(read_field(&mut cursor, &mut bit_buffer, &doubleword) == Some(field3));
-    assert!(read_field(&mut cursor, &mut bit_buffer, &quadword) == Some(field4));
+    assert_eq!(read_field(&mut cursor, &mut bit_buffer, &byte), Some(field1));
+    assert_eq!(read_field(&mut cursor, &mut bit_buffer, &word), Some(field2));
+    assert_eq!(read_field(&mut cursor, &mut bit_buffer, &doubleword), Some(field3));
+    assert_eq!(read_field(&mut cursor, &mut bit_buffer, &quadword), Some(field4));
+}
+
+#[test]
+fn test_read_field_floating_be() {
+    let mut buffer: Vec<u8> = vec!(0x40, 0x49, 0x0f, 0xdb);
+
+    let descr = "Field".to_string();
+    let endianness = Endianness::Big;
+
+    let float = Template::new(FieldType::float(endianness), descr.clone());
+
+    let field = Field::float(3.14159, endianness, descr.clone());
+
+    let mut cursor = Cursor::new(buffer.as_mut_slice());
+
+    let mut bit_buffer = Default::default();
+
+    let field_result = read_field(&mut cursor, &mut bit_buffer, &float);
+
+    let float = match field_result.unwrap().value {
+        Value::Float(val) => val,
+        _ => panic!("Decoding did not result in a float!"),
+    };
+
+    assert_approx_eq!(float, 3.1415927);
+}
+
+#[test]
+fn test_read_field_floating_le() {
+    let mut buffer: Vec<u8> = vec!(0xdb, 0x0f, 0x49, 0x40);
+
+    let descr = "Field".to_string();
+    let endianness = Endianness::Little;
+
+    let float = Template::new(FieldType::float(endianness), descr.clone());
+
+    let field = Field::float(3.14159, endianness, descr.clone());
+
+    let mut cursor = Cursor::new(buffer.as_mut_slice());
+
+    let mut bit_buffer = Default::default();
+
+    let field_result = read_field(&mut cursor, &mut bit_buffer, &float);
+
+    let float = match field_result.unwrap().value {
+        Value::Float(val) => val,
+        _ => panic!("Decoding did not result in a float!"),
+    };
+
+    assert_approx_eq!(float, 3.1415927);
+}
+
+#[test]
+fn test_read_field_double_be() {
+    let mut buffer: Vec<u8> = vec!(0x40, 0x09, 0x21, 0xfb, 0x54, 0x44, 0x2e, 0xea);
+    let descr = "Field".to_string();
+    let endianness = Endianness::Big;
+
+    let double = Template::new(FieldType::double(endianness), descr.clone());
+
+    let field = Field::double(3.141592541, endianness, descr.clone());
+
+    let mut cursor = Cursor::new(buffer.as_mut_slice());
+
+    let mut bit_buffer = Default::default();
+
+    let field_result = read_field(&mut cursor, &mut bit_buffer, &double);
+
+    let double = match field_result.unwrap().value {
+        Value::Double(val) => val,
+        _ => panic!("Decoding did not result in a double!"),
+    };
+
+    assert_approx_eq!(double, 3.141592541);
+}
+
+#[test]
+fn test_read_field_double_le() {
+    let mut buffer: Vec<u8> = vec!(0xea, 0x2e, 0x43, 0x54, 0xfb, 0x21, 0x09, 0x40);
+
+    let descr = "Field".to_string();
+    let endianness = Endianness::Little;
+
+    let double = Template::new(FieldType::double(endianness), descr.clone());
+
+    let field = Field::double(3.1415926535, endianness, descr.clone());
+
+    let mut cursor = Cursor::new(buffer.as_mut_slice());
+
+    let mut bit_buffer = Default::default();
+
+    let field_result = read_field(&mut cursor, &mut bit_buffer, &double);
+
+    let double = match field_result.unwrap().value {
+        Value::Double(val) => val,
+        _ => panic!("Decoding did not result in a double!"),
+    };
+
+    assert_approx_eq!(double, 3.141592541);
 }
 
 #[test]
@@ -136,10 +238,10 @@ fn test_read_field_le_byte() {
 
     let mut bit_buffer = Default::default();
 
-    assert!(read_field(&mut cursor, &mut bit_buffer, &byte) == Some(field1));
-    assert!(read_field(&mut cursor, &mut bit_buffer, &word) == Some(field2));
-    assert!(read_field(&mut cursor, &mut bit_buffer, &doubleword) == Some(field3));
-    assert!(read_field(&mut cursor, &mut bit_buffer, &quadword) == Some(field4));
+    assert_eq!(read_field(&mut cursor, &mut bit_buffer, &byte), Some(field1));
+    assert_eq!(read_field(&mut cursor, &mut bit_buffer, &word), Some(field2));
+    assert_eq!(read_field(&mut cursor, &mut bit_buffer, &doubleword), Some(field3));
+    assert_eq!(read_field(&mut cursor, &mut bit_buffer, &quadword), Some(field4));
 }
 
 

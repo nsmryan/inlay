@@ -197,21 +197,15 @@ impl BitBuffer {
 
             FieldType::Float(_) => {
                 unsafe {
-                    let mut cursor = Cursor::new(mem::transmute::<&u64, &[u8; 8]>(&value));
-                    match typ.endianness() {
-                        Endianness::Big => Some(Value::Float(cursor.read_f32::<BigEndian>().unwrap())),
-                        Endianness::Little => Some(Value::Float(cursor.read_f32::<LittleEndian>().unwrap())),
-                    }
+                    let mut ptr = mem::transmute::<&u64, &f32>(&value);
+                    Some(Value::Float(*ptr))
                 }
             }
 
             FieldType::Double(_) => {
                 unsafe {
-                    let mut cursor = Cursor::new(mem::transmute::<&u64, &[u8; 8]>(&value));
-                    match typ.endianness() {
-                        Endianness::Big => Some(Value::Double(cursor.read_f64::<BigEndian>().unwrap())),
-                        Endianness::Little => Some(Value::Double(cursor.read_f64::<LittleEndian>().unwrap())),
-                    }
+                    let mut ptr = mem::transmute::<&u64, &f64>(&value);
+                    Some(Value::Double(*ptr))
                 }
             }
         }
