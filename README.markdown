@@ -6,7 +6,7 @@ for initial testing and development while there may not be tools specific to the
 
 ## Usage
 ```bash
-inlay 0.2.2
+inlay 0.3.0
 nsmryan <nsmryan@gmail.com>
 A command line tool for quickly reading and writing simple binary formats
 
@@ -18,13 +18,14 @@ FLAGS:
     -V, --version    Prints version information
 
 SUBCOMMANDS:
-    decode
-    encode
+    decode    CLI tool for encoding and decoding simple binary data structures
+    encode    CLI tool for encoding and decoding simple binary data structures
     help      Prints this message or the help of the given subcommand(s)
+    summary   CLI tool for encoding and decoding simple binary data structures
 ```
 
 ### Decoding
-```bash
+```txt
 USAGE:
     inlay.exe decode [FLAGS] [OPTIONS] <template_file> [in_file_globs]...
 
@@ -43,7 +44,7 @@ ARGS:
 ```
 
 ### Encoding
-```bash
+```txt
 USAGE:
     inlay.exe encode [FLAGS] [OPTIONS] <template_file> [in_file_globs]...
 
@@ -59,6 +60,13 @@ OPTIONS:
 ARGS:
     <template_file>
     <in_file_globs>...
+```
+
+### Summary
+```txt
+USAGE:
+    inlay.exe summary <template_file>
+
 ```
 
 ## Installation
@@ -195,6 +203,13 @@ Decode multiple binary files into a single file, row format:
 
 Decode multiple binary files into a single file, col format:
   * inlay decode template.csv data.bin data2.bin data3.bin -o output.csv
+
+### Summary
+Summarize your binary format:
+  * inlay summary template.csv
+
+This provides a printout of the binary structure, providing byte and bit sizes
+as well as byte and bit offsets from the start of the structure.
 
 # License
 Inlay is licensed under either MIT or APACHE2, whichever you prefer.
